@@ -1,6 +1,6 @@
 # max values in rho and z of of the mesh
- rhomax = 16.0 
- zmax =  16.0 # dont change zmax !!
+ rhomax = 8.0 
+ zmax =  8.0 # dont change zmax !!
 vertices =
 { 
   { 0 , 0},     # vertex 0

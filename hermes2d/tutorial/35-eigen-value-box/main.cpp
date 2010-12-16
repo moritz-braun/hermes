@@ -1,7 +1,9 @@
 #define H2D_REPORT_INFO
 #include "hermes2d.h"
 #include <stdio.h>
-// This is a long version of example 03-poisson: function solve_linear() is not used.
+// This example solves the two dimensional Schroedinger equation for the 
+// particle in a box.
+
 
 int P_INIT = 4;                                   // Uniform polynomial degree of mesh elements.
 MatrixSolverType matrix_solver = SOLVER_UMFPACK;  // Possibilities: SOLVER_UMFPACK, SOLVER_PETSC,

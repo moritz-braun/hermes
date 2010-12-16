@@ -32,8 +32,11 @@ Scalar bilinear_form_V(int n, double *wt, Func<Real> *u_ext[], Func<Real> *u,
 Ord bilinear_form_ord(int n, double *wt, Func<Ord> *u_ext[], Func<Ord> *u,
                   Func<Ord> *v, Geom<Ord> *e, ExtData<Ord> *ext)
 {
-  return u->val[0] * v->val[0] * e->x[0] * e->x[0]*e->x[0]*e->x[0]*e->x[0]*e->x[0]; // returning the sum of the degrees of the basis
-                                                    // and test function plus six
+  return u->val[0] * v->val[0] *\
+ e->x[0] * e->x[0] * e->x[0] * e->x[0] *\
+ e->x[0] * e->x[0] * e->x[0] * e->x[0]; 
+// returning the sum of the degrees of the basis
+// and test function plus eight
 }
 
 template<typename Real, typename Scalar>

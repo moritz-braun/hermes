@@ -1,0 +1,25 @@
+
+-------------------------------------------------
+          This application uses Hermes2D
+       Hermes2D is a C++ library for rapid 
+  development of adaptive FEM and hp-FEM solvers
+      developed by the hp-FEM group at UNR
+     and distributed under the GPL license.
+    For more details visit http://hpfem.org/.
+-------------------------------------------------
+/home/braunm/hermes/hermes2d/tutorial/39-eigen-value-h2plus/solvers/eigen.py:99: DeprecationWarning: PyArray_FromDimsAndDataAndDescr: use PyArray_NewFromDescr.
+  itsolvers.qmrs)
+/home/braunm/hermes/hermes2d/tutorial/39-eigen-value-h2plus/solvers/eigen.py:99: DeprecationWarning: PyArray_FromDims: use PyArray_SimpleNew.
+  itsolvers.qmrs)
+Mesa warning: couldn't open libtxc_dxtn.so, software DXTn compression/decompression unavailable
+Mesa: Initializing x86-64 optimizations
+vertex_id_nucleus=226
+[34m[1mI ndof = 11322[0m
+[34m[1mI nelems = 1685[0m
+[34mV Total running time for assembling matrices : 17.7416 s[0m
+[34mV Time for converting matrices to CSR  : 0.098898 s[0m
+Python initialized
+E=-2.2052679295583939   Delta E=4.9943140600916536e-07
+[34mV Total running time for solving generalized eigenvalue problem: 0.82328 s[0m
+  << press spacebar to continue >>
+[35mD Closed view "Solution", window #1[0m
