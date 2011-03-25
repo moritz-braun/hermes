@@ -1,4 +1,4 @@
-int P=4;
+int P=3;
 template<typename real, typename scalar>
 scalar bilinear_form_left(int n, double *wt, Func<real> *u_ext[], Func<real> *u, Func<real> *v, Geom<real> *e, ExtData<real> *ext) 
     {

@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
   int test_type=atoi(argv[1]);
   if ( test_type == 1){
     INIT_REF_NUM = 0;
-    REF_ORIGIN = 5;
+    REF_ORIGIN = 3;
   }
   else if ( test_type == 2){
     INIT_REF_NUM = 2;
@@ -104,10 +104,22 @@ int main(int argc, char* argv[])
 	}
       }
     }
+    info("number of elements at origin =%d",io);
     for (int i=0;i<8;i++) {
       info("%d %d\n",i,list_of_ids[i]);
       mesh.refine_element(list_of_ids[i], H3D_H3D_H3D_REFT_HEX_XYZ);
     }
+    /*
+    for(std::map<unsigned int, Element*>::const_iterator it=mesh.elements.begin(); it != mesh.elements.end(); it++){
+      bool not_refined_already=true;
+      for (int i=0;i<8;i++) {
+	if (list_of_ids[i] == it->first) 
+	  not_refined_already=false;
+      }
+      if  ( not_refined_already )
+	mesh.refine_element(it->first,H3D_H3D_H3D_REFT_HEX_XYZ);
+    }
+    */
     ir++;
     int NUM_ELEMS=mesh.get_max_element_id();
     info("NUM_ELEMS=%d",NUM_ELEMS);
