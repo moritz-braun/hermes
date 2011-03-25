@@ -25,7 +25,7 @@ using namespace RefinementSelectors;
 const int INIT_GLOB_REF_NUM = 3;                  // Number of initial uniform mesh refinements.
 const int INIT_BDY_REF_NUM = 4;                   // Number of initial refinements towards boundary.
 const int P_INIT = 2;                             // Initial polynomial degree.
-const double time_step = 0.2;                     // Time step.
+const double time_step = 0.2;                           // Time step.
 const double T_FINAL = 5.0;                       // Time interval length.
 const double NEWTON_TOL = 1e-5;                   // Stopping criterion for the Newton's method.
 const int NEWTON_MAX_ITER = 100;                  // Maximum allowed number of Newton iterations.
@@ -34,51 +34,16 @@ MatrixSolverType matrix_solver = SOLVER_UMFPACK;  // Possibilities: SOLVER_AMESO
 
 const double ALPHA = 4.0;                         // For the nonlinear thermal conductivity.
 
-// Thermal conductivity (temperature-dependent).
-// Note: for any u, this function has to be positive.
-template<typename Real>
-Real lam(Real u) { return 1 + pow(u, ALPHA);}
-
-// Derivative of the thermal conductivity with respect to 'u'.
-template<typename Real>
-Real dlam_du(Real u) { return ALPHA*pow(u, ALPHA - 1);}
-
-// This function is used to define Dirichlet boundary conditions.
-double dir_lift(double x, double y, double& dx, double& dy) {
-  dx = (y+10)/100.;
-  dy = (x+10)/100.;
-  return (x+10)*(y+10)/100.;
-}
-
-// Initial condition. It will be projected on the FE mesh 
-// to obtain initial coefficient vector for the Newton's method.
-scalar init_cond(double x, double y, double& dx, double& dy)
-{
-  return dir_lift(x, y, dx, dy);
-}
-
-// Boundary markers.
-const int BDY_DIRICHLET = 1;
-
-// Essential (Dirichlet) boundary condition markers.
-scalar essential_bc_values(double x, double y)
-{
-  double dx, dy;
-  return dir_lift(x, y, dx, dy);
-}
-
-// Heat sources (can be a general function of 'x' and 'y').
-template<typename Real>
-Real heat_src(Real x, Real y)
-{
-  return 1.0;
-}
+const std::string BDY_DIRICHLET = "1";
 
 // Weak forms.
-#include "forms.cpp"
+#include "definitions.cpp"
 
 int main(int argc, char* argv[])
 {
+  // Instantiate a class with global functions.
+  Hermes2D hermes2d;
+
   // Load the mesh.
   Mesh mesh;
   H2DReader mloader;
@@ -86,28 +51,22 @@ int main(int argc, char* argv[])
 
   // Initial mesh refinements.
   for(int i = 0; i < INIT_GLOB_REF_NUM; i++) mesh.refine_all_elements();
-  mesh.refine_towards_boundary(1, INIT_BDY_REF_NUM);
+  mesh.refine_towards_boundary(BDY_DIRICHLET, INIT_BDY_REF_NUM);
 
-  // Enter boundary markers.
-  BCTypes bc_types;
-  bc_types.add_bc_dirichlet(BDY_DIRICHLET);
-
-  // Enter Dirichlet boundary values.
-  BCValues bc_values;
-  bc_values.add_function(BDY_DIRICHLET, essential_bc_values);   
+  // Initialize boundary conditions.
+  EssentialBCNonConst bc_essential(BDY_DIRICHLET);
+  EssentialBCs bcs(&bc_essential);
 
   // Create an H1 space with default shapeset.
-  H1Space space(&mesh, &bc_types, &bc_values, P_INIT);
-  int ndof = Space::get_num_dofs(&space);
+  H1Space space(&mesh, &bcs, P_INIT);
+  int ndof = space.get_num_dofs();
   info("ndof = %d.", ndof);
 
   // Previous time level solution (initialized by the initial condition).
-  Solution u_prev_time(&mesh, init_cond);
+  CustomInitialCondition u_prev_time(&mesh);
 
-  // Initialize the weak formulation.
-  WeakForm wf;
-  wf.add_matrix_form(callback(jac), HERMES_NONSYM, HERMES_ANY);
-  wf.add_vector_form(callback(res), HERMES_ANY, &u_prev_time);
+  // Initialize the weak formulation
+  CustomWeakFormHeatTransferNonlinear wf(ALPHA, time_step, &u_prev_time);
 
   // Project the initial condition on the FE space to obtain initial
   // coefficient vector for the Newton's method.
@@ -137,7 +96,7 @@ int main(int argc, char* argv[])
 
     // Perform Newton's iteration.
     bool verbose = true;
-    if (!solve_newton(coeff_vec, &dp, solver, matrix, rhs, 
+    if (!hermes2d.solve_newton(coeff_vec, &dp, solver, matrix, rhs, 
 		      NEWTON_TOL, NEWTON_MAX_ITER, verbose)) {
       error("Newton's iteration failed.");
     }

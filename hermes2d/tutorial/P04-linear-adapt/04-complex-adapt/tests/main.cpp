@@ -69,7 +69,7 @@ scalar essential_bc_values(int ess_bdy_marker, double x, double y)
 }
 
 // Weak forms.
-#include "forms.cpp"
+#include "../forms.cpp"
 
 int main(int argc, char* argv[])
 {
@@ -80,12 +80,12 @@ int main(int argc, char* argv[])
   // Load the mesh.
   Mesh mesh;
   H2DReader mloader;
-  mloader.load("domain2.mesh", &mesh);
+  mloader.load("../domain2.mesh", &mesh);
 
   // Perform initial mesh refinements.
   for (int i=0; i<INIT_REF_NUM; i++) mesh.refine_all_elements();
 
-  // Enter boundary markers.
+  // Initialize boundary conditions.
   BCTypes bc_types;
   bc_types.add_bc_dirichlet(Hermes::vector<int>(BDY_RIGHT, BDY_TOP, BDY_LEFT));
   bc_types.add_bc_neumann(BDY_BUTTOM);
@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
     info("---- Adaptivity step %d:", as);
 
     // Construct globally refined reference mesh and setup reference space.
-    Space* ref_space = construct_refined_space(&space);
+    Space* ref_space = Space::construct_refined_space(&space);
 
     // Assemble the reference problem.
     info("Solving on reference mesh.");

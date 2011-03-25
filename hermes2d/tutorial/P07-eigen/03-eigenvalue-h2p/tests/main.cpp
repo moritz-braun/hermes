@@ -46,14 +46,14 @@ double  wfun (double rho,double z){
 // Boundary markers.
 const int BDY_BOTTOM = 1, BDY_RIGHT = 2, BDY_TOP = 3, BDY_LEFT = 4;
 
-#include "forms.cpp"
+#include "../forms.cpp"
 
 int main(int argc, char* argv[])
 {
   // Load the mesh.
   Mesh mesh;
   H2DReader mloader;
-  mloader.load("domain.mesh", &mesh);
+  mloader.load("../domain.mesh", &mesh);
 
   // Time measurement.
   TimePeriod cpu_time;
@@ -79,7 +79,7 @@ int main(int argc, char* argv[])
   mesh.refine_towards_vertex(vertex_id_nucleus,10);
   for (int i=0;i<FINAL_REF_NUM;i++) mesh.refine_all_elements();
 
-  // Enter boundary markers. 
+  // Initialize boundary conditions. 
   BCTypes bc_types;
   bc_types.add_bc_dirichlet(Hermes::vector<int>(BDY_RIGHT, BDY_TOP));
 

@@ -35,10 +35,9 @@ double time_step = 20;                            // Time step in seconds.
 
 // Spatial adaptivity.
 const int UNREF_FREQ = 1;                         // Every UNREF_FREQth time step the mesh is derefined.
-const int UNREF_LEVEL = 1;                        // 1 = one layer of refinements is shaved off and poly degrees
-                                                  // of all elements reset to P_INIT; 2 = mesh reset to basemesh.  
-                                                  // TODO: Add a third option where one layer will be taken off 
-                                                  // and just one polynomial degree subtracted.
+const int UNREF_METHOD = 3;                       // 1... mesh reset to basemesh and poly degrees to P_INIT.   
+                                                  // 2... one ref. layer shaved off, poly degrees reset to P_INIT.
+                                                  // 3... one ref. layer shaved off, poly degrees decreased by one. 
 const double THRESHOLD = 0.3;                     // This is a quantitative parameter of the adapt(...) function and
                                                   // it has different meanings for various adaptive strategies (see below).
 const int STRATEGY = 0;                           // Adaptive strategy:
@@ -92,7 +91,7 @@ const int NEWTON_MAX_ITER = 100;                  // Maximum allowed number of N
 // Implicit methods: 
 //   Implicit_RK_1, Implicit_Crank_Nicolson_2_2, Implicit_SIRK_2_2, Implicit_ESIRK_2_2, Implicit_SDIRK_2_2, 
 //   Implicit_Lobatto_IIIA_2_2, Implicit_Lobatto_IIIB_2_2, Implicit_Lobatto_IIIC_2_2, Implicit_Lobatto_IIIA_3_4, 
-//   Implicit_Lobatto_IIIB_3_4, Implicit_Lobatto_IIIC_3_4, Implicit_Radau_IIA_3_5, Implicit_SDIRK_4_5.
+//   Implicit_Lobatto_IIIB_3_4, Implicit_Lobatto_IIIC_3_4, Implicit_Radau_IIA_3_5, Implicit_SDIRK_5_4.
 // Embedded explicit methods:
 //   Explicit_HEUN_EULER_2_12_embedded, Explicit_BOGACKI_SHAMPINE_4_23_embedded, Explicit_FEHLBERG_6_45_embedded,
 //   Explicit_CASH_KARP_6_45_embedded, Explicit_DORMAND_PRINCE_7_45_embedded.
@@ -148,7 +147,7 @@ int main(int argc, char* argv[])
   basemesh.refine_towards_boundary(BDY_BOTTOM, INIT_REF_NUM_BDY);
   mesh.copy(&basemesh);
 
-  // Enter boundary markers.
+  // Initialize boundary conditions.
   BCTypes bc_types;
   bc_types.add_bc_neumann(Hermes::vector<int>(BDY_RIGHT, BDY_LEFT));
   bc_types.add_bc_newton(Hermes::vector<int>(BDY_BOTTOM, BDY_TOP));
@@ -201,9 +200,20 @@ int main(int argc, char* argv[])
     if (ts > 1 && ts % UNREF_FREQ == 0) 
     {
       info("Global mesh derefinement.");
-      if (UNREF_LEVEL == 1) mesh.unrefine_all_elements();
-      else mesh.copy(&basemesh);
-      space.set_uniform_order(P_INIT);
+      switch (UNREF_METHOD) {
+        case 1: mesh.copy(&basemesh);
+                space.set_uniform_order(P_INIT);
+                break;
+        case 2: mesh.unrefine_all_elements();
+                space.set_uniform_order(P_INIT);
+                break;
+        case 3: mesh.unrefine_all_elements();
+                //space.adjust_element_order(-1, P_INIT);
+                space.adjust_element_order(-1, -1, P_INIT, P_INIT);
+                break;
+        default: error("Wrong global derefinement method.");
+      }
+
       ndof = Space::get_num_dofs(&space);
     }
 
@@ -215,7 +225,7 @@ int main(int argc, char* argv[])
     double err_est;
     do {
       // Construct globally refined reference mesh and setup reference space.
-      Space* ref_space = construct_refined_space(&space);
+      Space* ref_space = Space::construct_refined_space(&space);
 
       OGProjection::project_global(ref_space, Hermes::vector<Solution *>(&sln_prev_time), 
                      Hermes::vector<Solution *>(&sln_prev_time), matrix_solver);

@@ -13,17 +13,16 @@
 /// You should have received a copy of the GNU General Public License
 /// along with Hermes2D. If not, see <http:///www.gnu.org/licenses/>.
 
-#define HERMES_REPORT_INFO
-#define HERMES_REPORT_WARN
-
-#ifndef __H2D_FEPROBLEM_H
-#define __H2D_FEPROBLEM_H
+#ifndef __H2D_DISCRETE_PROBLEM_H
+#define __H2D_DISCRETE_PROBLEM_H
 
 #include "../../hermes_common/matrix.h"
 #include "../../hermes_common/solver/solver.h"
+#include "../../hermes_common/solver/dpinterface.h"
+#include "../../hermes_common/tables.h"
 #include "adapt/adapt.h"
 #include "graph.h"
-#include "weakform/forms.h"
+#include "function/forms.h"
 #include "weakform/weakform.h"
 #include "views/view.h"
 #include "views/scalar_view.h"
@@ -31,7 +30,6 @@
 #include "views/order_view.h"
 #include "function/function.h"
 #include "neighbor.h"
-#include "tables.h"
 #include "ref_selectors/selector.h"
 #include <map>
 
@@ -43,21 +41,30 @@ class SparseMatrix;
 class Vector;
 class Solver;
 
+
 /// Discrete problem class.
 ///
 /// This class does assembling into external matrix / vactor structures.
 ///
-class HERMES_API DiscreteProblem
+class HERMES_API DiscreteProblem : public DiscreteProblemInterface
 {
-public:
-  /// Constructor.
-  DiscreteProblem(WeakForm* wf, Hermes::vector<Space *> spaces, bool is_linear = false);
 
+friend class KellyTypeAdapt;
+
+public:
+  /// Constructors.
+  DiscreteProblem(WeakForm* wf, Hermes::vector<Space *> spaces, bool is_linear = false);
+  DiscreteProblem(WeakForm* wf, Space* space, bool is_linear = false);
+
+  /// Non-parameterized constructor (currently used only in KellyTypeAdapt to gain access to NeighborSearch methods).
+  DiscreteProblem() : wf(NULL), pss(NULL) {num_user_pss = 0; sp_seq = NULL;}
+
+  /// Init function. Common code for the constructors.
+  void init();
 
   /// Destuctor.
   virtual ~DiscreteProblem();
   void free();
-
 
   /// GET functions.
   /// Get pointer to n-th space.
@@ -71,9 +78,6 @@ public:
 
   /// Get all spaces as a Hermes::vector.
   Hermes::vector<Space *> get_spaces() {return this->spaces;}
-
-  /// Get the number of spaces.
-  int get_num_spaces() {return this->spaces.size();}
 
   /// This is different from H3D.
   PrecalcShapeset* get_pss(int n) {  return this->pss[n];  }
@@ -215,52 +219,105 @@ public:
 
 protected:
   /// Assembling.
+  /// Experimental caching of vector valued (vector) forms.
+  struct SurfVectorFormsKey
+  {
+    WeakForm::VectorFormSurf* vfs;
+    int element_id, isurf, shape_fn;
+#ifdef _MSC_VER
+    UINT64 sub_idx;
+    SurfVectorFormsKey(WeakForm::VectorFormSurf* vfs, int element_id, int isurf, int shape_fn, UINT64 sub_idx)
+      : vfs(vfs), element_id(element_id), isurf(isurf), shape_fn(shape_fn), sub_idx(sub_idx) {};
+#else
+    unsigned int sub_idx;
+    SurfVectorFormsKey(WeakForm::VectorFormSurf* vfs, int element_id, int isurf, int shape_fn, unsigned int sub_idx)
+      : vfs(vfs), element_id(element_id), isurf(isurf), shape_fn(shape_fn), sub_idx(sub_idx) {};
+#endif
+  };
 
   DiscontinuousFunc<Ord>* init_ext_fn_ord(NeighborSearch* ns, MeshFunction* fu);
 
-  int calc_order_matrix_form_vol(WeakForm::MatrixFormVol *mfv, Hermes::vector<Solution *> u_ext,
-                                  PrecalcShapeset *fu, PrecalcShapeset *fv, RefMap *ru, RefMap *rv);
-
-  // Evaluates weak form on element given by the RefMap, using adaptive 
-  // numerical quadrature.
-  scalar eval_form_adaptive(int order_init, scalar result_init, double rel_err_tol, 
-                            WeakForm::MatrixFormVol *mfv, 
-                            Hermes::vector<Solution *> u_ext,
-                            PrecalcShapeset *fu, PrecalcShapeset *fv, 
-                            RefMap *ru, RefMap *rv);
+  // Matrix volume forms.
 
   // Main function for the evaluation of weak forms. 
   // Evaluates weak form on element given by the RefMap, 
   // using either non-adaptive or adaptive numerical quadrature.
   scalar eval_form(WeakForm::MatrixFormVol *mfv, Hermes::vector<Solution *> u_ext,
                    PrecalcShapeset *fu, PrecalcShapeset *fv, RefMap *ru, RefMap *rv);
+
+  int calc_order_matrix_form_vol(WeakForm::MatrixFormVol *mfv, Hermes::vector<Solution *> u_ext,
+                                  PrecalcShapeset *fu, PrecalcShapeset *fv, RefMap *ru, RefMap *rv);
   
   // Elementary function used in eval_form() in adaptive mode.
   scalar eval_form_subelement(int order, WeakForm::MatrixFormVol *mfv, 
                               Hermes::vector<Solution *> u_ext,
                               PrecalcShapeset *fu, PrecalcShapeset *fv, 
                               RefMap *ru, RefMap *rv);
+  
+  // Evaluates weak form on element given by the RefMap, using adaptive 
+  // numerical quadrature.
+  scalar eval_form_adaptive(int order_init, scalar result_init,
+                            WeakForm::MatrixFormVol *mfv, 
+                            Hermes::vector<Solution *> u_ext,
+                            PrecalcShapeset *fu, PrecalcShapeset *fv, 
+                            RefMap *ru, RefMap *rv);
 
-  // Elementary function used in eval_form() in non-adaptive mode.
-  int calc_order_vector_form_vol(WeakForm::VectorFormVol *mfv, Hermes::vector<Solution *> u_ext,
-                                  PrecalcShapeset *fv, RefMap *rv);
+  // Vector volume forms. The functions provide the same functionality as the
+  // parallel ones for matrix volume forms.
 
   scalar eval_form(WeakForm::VectorFormVol *vfv, Hermes::vector<Solution *> u_ext,
                    PrecalcShapeset *fv, RefMap *rv);
+
+  int calc_order_vector_form_vol(WeakForm::VectorFormVol *mfv, Hermes::vector<Solution *> u_ext,
+                                  PrecalcShapeset *fv, RefMap *rv);
   
+  scalar eval_form_subelement(int order, WeakForm::VectorFormVol *vfv, 
+                              Hermes::vector<Solution *> u_ext,
+                              PrecalcShapeset *fv, RefMap *rv);
+  
+  scalar eval_form_adaptive(int order_init, scalar result_init,
+                            WeakForm::VectorFormVol *vfv, 
+                            Hermes::vector<Solution *> u_ext,
+                            PrecalcShapeset *fv, RefMap *rv);
+ 
+  // Matrix surface forms. The functions provide the same functionality as the
+  // parallel ones for matrix volume forms.
+  
+  scalar eval_form(WeakForm::MatrixFormSurf *mfs, 
+                                  Hermes::vector<Solution *> u_ext, 
+                                  PrecalcShapeset *fu, PrecalcShapeset *fv, RefMap *ru, RefMap *rv, SurfPos* surf_pos);
+
   int calc_order_matrix_form_surf(WeakForm::MatrixFormSurf *mfs, 
                                   Hermes::vector<Solution *> u_ext,
                                   PrecalcShapeset *fu, PrecalcShapeset *fv, 
                                   RefMap *ru, RefMap *rv, SurfPos* surf_pos);
 
-  scalar eval_form(WeakForm::MatrixFormSurf *mfs, Hermes::vector<Solution *> u_ext,
-         PrecalcShapeset *fu, PrecalcShapeset *fv, RefMap *ru, RefMap *rv, SurfPos* surf_pos);
-  
-  int calc_order_vector_form_surf(WeakForm::VectorFormSurf *vfs, Hermes::vector<Solution *> u_ext,
-         PrecalcShapeset *fv, RefMap *rv, SurfPos* surf_pos);
+  scalar eval_form_subelement(int order, WeakForm::MatrixFormSurf *mfs, Hermes::vector<Solution *> u_ext,
+                              PrecalcShapeset *fu, PrecalcShapeset *fv, RefMap *ru, RefMap *rv, SurfPos* surf_pos);
 
-  scalar eval_form(WeakForm::VectorFormSurf *vfs, Hermes::vector<Solution *> u_ext,
-         PrecalcShapeset *fv, RefMap *rv, SurfPos* surf_pos);
+  scalar eval_form_adaptive(int order_init, scalar result_init,
+                                             WeakForm::MatrixFormSurf *mfs, Hermes::vector<Solution *> u_ext,
+                                             PrecalcShapeset *fu, PrecalcShapeset *fv, RefMap *ru, 
+                                             RefMap *rv, SurfPos* surf_pos);
+
+  // Vector surface forms. The functions provide the same functionality as the
+  // parallel ones for matrix volume forms.
+  
+  scalar eval_form(WeakForm::VectorFormSurf *vfs, 
+                                  Hermes::vector<Solution *> u_ext, 
+                                  PrecalcShapeset *fv, RefMap *rv, SurfPos* surf_pos);
+
+  int calc_order_vector_form_surf(WeakForm::VectorFormSurf *vfs, Hermes::vector<Solution *> u_ext,
+                                  PrecalcShapeset *fv, RefMap *rv, SurfPos* surf_pos);
+
+  scalar eval_form_subelement(int order, WeakForm::VectorFormSurf *vfs, Hermes::vector<Solution *> u_ext,
+                              PrecalcShapeset *fv, RefMap *rv, SurfPos* surf_pos);
+
+  scalar eval_form_adaptive(int order_init, scalar result_init,
+                                             WeakForm::VectorFormSurf *vfs, Hermes::vector<Solution *> u_ext,
+                                             PrecalcShapeset *fv, RefMap *rv, SurfPos* surf_pos);
+
+  // DG forms.
 
   int calc_order_dg_matrix_form(WeakForm::MatrixFormSurf *mfs, Hermes::vector<Solution *> u_ext,
                                   PrecalcShapeset *fu, PrecalcShapeset *fv, RefMap *ru, SurfPos* surf_pos,
@@ -279,14 +336,30 @@ protected:
                                      PrecalcShapeset *fv, RefMap *rv, 
                                      SurfPos* surf_pos, LightArray<NeighborSearch*>& neighbor_searches, int neighbor_index_v);
 
-  ExtData<Ord>* init_ext_fns_ord(Hermes::vector<MeshFunction *> &ext);
-  ExtData<Ord>* init_ext_fns_ord(Hermes::vector<MeshFunction *> &ext, int edge);
-  ExtData<Ord>* init_ext_fns_ord(Hermes::vector<MeshFunction *> &ext, LightArray<NeighborSearch*>& neighbor_searches);
-  ExtData<scalar>* init_ext_fns(Hermes::vector<MeshFunction *> &ext, RefMap *rm, const int order);
-  ExtData<scalar>* init_ext_fns(Hermes::vector<MeshFunction *> &ext, LightArray<NeighborSearch*>& neighbor_searches, int order);
+  ExtData<Ord>* init_ext_fns_ord(Hermes::vector<MeshFunction *> &ext, 
+                                 Hermes::vector<scalar> &param);
+  ExtData<Ord>* init_ext_fns_ord(Hermes::vector<MeshFunction *> &ext, 
+                                 Hermes::vector<scalar> &param, int edge);
+  ExtData<Ord>* init_ext_fns_ord(Hermes::vector<MeshFunction *> &ext,
+                                 Hermes::vector<scalar> &param, 
+                                 LightArray<NeighborSearch*>& neighbor_searches);
+  ExtData<scalar>* init_ext_fns(Hermes::vector<MeshFunction *> &ext, 
+                                Hermes::vector<scalar> &param, 
+                                RefMap *rm, const int order);
+  ExtData<scalar>* init_ext_fns(Hermes::vector<MeshFunction *> &ext, 
+                                Hermes::vector<scalar> &param, 
+                                LightArray<NeighborSearch*>& neighbor_searches, int order);
 
   Func<double>* get_fn(PrecalcShapeset *fu, RefMap *rm, const int order);
   Func<Ord>* get_fn_ord(const int order);
+
+  struct VolVectorFormsKey
+  {
+    WeakForm::VectorFormVol* vfv;
+    int element_id, shape_fn;
+    VolVectorFormsKey(WeakForm::VectorFormVol* vfv, int element_id, int shape_fn)
+      : vfv(vfv), element_id(element_id), shape_fn(shape_fn) {};
+  };
 
 
   /// Pure DG functionality.
@@ -352,6 +425,9 @@ protected:
   /// Members.
   WeakForm* wf;
 
+  Mesh::ElementMarkersConversion* element_markers_conversion;
+  Mesh::BoundaryMarkersConversion* boundary_markers_conversion;
+
   Geom<Ord> geom_ord;
 
   /// If the problem has only constant test functions, there is no need for order calculation,
@@ -390,6 +466,7 @@ protected:
   /// Functions handling the above caches, and also other caches.
   void init_cache();
   void delete_cache();
+  void delete_single_geom_cache(int order);
 
   /// Class handling various caches used in assembling.
   class AssemblingCaches {
@@ -530,24 +607,6 @@ protected:
   AssemblingCaches assembling_caches;
 };
 
-/// Create globally refined space.
-HERMES_API Hermes::vector<Space *>* construct_refined_spaces(Hermes::vector<Space *> coarse, int order_increase = 1);
-HERMES_API Space* construct_refined_space(Space* coarse, int order_increase = 1);
 
-HERMES_API double get_l2_norm(Vector* vec);
-
-/// New interface, still in developement
-/// HERMES_API bool solve_newton(scalar* coeff_vec, DiscreteProblem* dp, Solver* solver, SparseMatrix* matrix,
-///		               Vector* rhs, double NEWTON_TOL, int NEWTON_MAX_ITER, bool verbose,
-///                             unsigned int stop_condition = NEWTON_WATCH_RESIDUAL);
-
-HERMES_API bool solve_newton(scalar* coeff_vec, DiscreteProblem* dp, Solver* solver, SparseMatrix* matrix,
-			     Vector* rhs, double NEWTON_TOL, int NEWTON_MAX_ITER, bool verbose = false,
-                             bool residual_as_function = false,
-                             double damping_coeff = 1.0, double max_allowed_residual_norm = 1e6);
-
-HERMES_API bool solve_picard(WeakForm* wf, Space* space, Solution* sln_prev_iter,
-                             MatrixSolverType matrix_solver, double picard_tol,
-			     int picard_max_iter, bool verbose);
 
 #endif

@@ -35,19 +35,19 @@ scalar conc_ic(double x, double y, scalar& dx, scalar& dy)
   { return (x <= x1) ? 0.0 : 1.0 - exp(Le*(x1 - x)); }
 
 // Weak forms, definition of reaction rate omega.
-# include "forms.cpp"
+# include "../forms.cpp"
 
 int main(int argc, char* argv[])
 {
   // Load the mesh.
   Mesh mesh;
   H2DReader mloader;
-  mloader.load("domain.mesh", &mesh);
+  mloader.load("../domain.mesh", &mesh);
 
   // Initial mesh refinements.
   for(int i = 0; i < INIT_REF_NUM; i++) mesh.refine_all_elements();
 
-  // Enter boundary markers.
+  // Initialize boundary conditions.
   BCTypes bc_types;
   bc_types.add_bc_dirichlet(BDY_LEFT);
   bc_types.add_bc_neumann(BDY_NEUMANN);

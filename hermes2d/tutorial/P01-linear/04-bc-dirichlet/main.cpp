@@ -23,20 +23,11 @@ const int INIT_REF_NUM = 2;                       // Number of initial uniform m
 MatrixSolverType matrix_solver = SOLVER_UMFPACK;  // Possibilities: SOLVER_AMESOS, SOLVER_AZTECOO, SOLVER_MUMPS,
                                                   // SOLVER_PETSC, SOLVER_SUPERLU, SOLVER_UMFPACK.
 
-// Boundary markers.
-const int BDY_BOTTOM = 1, BDY_OUTER = 2, BDY_LEFT = 3, BDY_INNER = 4;
-
 // Problem parameters.
 const double CONST_F = -4.0; 
 
-// Essential (Dirichlet) boundary condition values.
-scalar essential_bc_values(double x, double y)
-{
-  return (-CONST_F/4.0)*(x*x + y*y);
-}
-
 // Weak forms.
-#include "forms.cpp"
+#include "definitions.cpp"
 
 int main(int argc, char* argv[])
 {
@@ -48,23 +39,20 @@ int main(int argc, char* argv[])
   // Perform initial mesh refinements.
   for(int i=0; i < INIT_REF_NUM; i++) mesh.refine_all_elements();
 
-  // Enter boundary markers.
-  BCTypes bc_types;
-  bc_types.add_bc_dirichlet(Hermes::vector<int>(BDY_BOTTOM, BDY_OUTER, BDY_LEFT, BDY_INNER));
-
-  // Enter Dirichlet boudnary values.
-  BCValues bc_values;
-  bc_values.add_function(Hermes::vector<int>(BDY_BOTTOM, BDY_OUTER, BDY_LEFT, BDY_INNER), essential_bc_values);
-
-  // Create an H1 space with default shapeset.
-  H1Space space(&mesh, &bc_types, &bc_values, P_INIT);
-  int ndof = Space::get_num_dofs(&space);
-  info("ndof = %d", ndof);
+  // Set exact solution.
+  CustomExactSolution exact(&mesh, CONST_F);
 
   // Initialize the weak formulation.
-  WeakForm wf;
-  wf.add_matrix_form(callback(bilinear_form));
-  wf.add_vector_form(callback(linear_form));
+  CustomWeakFormPoisson wf(CONST_F);
+
+  // Initialize boundary conditions
+  DefaultEssentialBCNonConst bc_essential("Dirichlet", &exact);
+  EssentialBCs bcs(&bc_essential);
+
+  // Create an H1 space with default shapeset.
+  H1Space space(&mesh, &bcs, P_INIT);
+  int ndof = space.get_num_dofs();
+  info("ndof = %d", ndof);
 
   // Initialize the FE problem.
   bool is_linear = true;

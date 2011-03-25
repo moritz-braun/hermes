@@ -23,15 +23,15 @@ MatrixSolverType matrix_solver = SOLVER_UMFPACK;  // Possibilities: SOLVER_AMESO
                                                   // SOLVER_PETSC, SOLVER_SUPERLU, SOLVER_UMFPACK.
 
 // Boundary markers.
-const int BDY_BOTTOM = 1, BDY_OUTER = 2, BDY_LEFT = 3, BDY_INNER = 4;
+const std::string BDY_BOTTOM = "1", BDY_OUTER = "2", BDY_LEFT = "3", BDY_INNER = "4";
 
 // Problem parameters.
 const double T1 = 30.0;       // Prescribed temperature on Gamma_left.
 const double T0 = 20.0;       // Outer temperature on Gamma_bottom.
-const double H  = 0.05;       // Heat flux on Gamma_bottom.
+const double h  = 0.05;       // Heat flux on Gamma_bottom.
 
 // Weak forms.
-#include "forms.cpp"
+#include "definitions.cpp"
 
 int main(int argc, char* argv[])
 {
@@ -44,26 +44,17 @@ int main(int argc, char* argv[])
   for(int i=0; i < INIT_REF_NUM; i++) mesh.refine_all_elements();
   mesh.refine_towards_vertex(3, CORNER_REF_LEVEL);
 
-  // Enter boundary markers.
-  BCTypes bc_types;
-  bc_types.add_bc_dirichlet(BDY_LEFT);
-  bc_types.add_bc_neumann(Hermes::vector<int>(BDY_OUTER, BDY_INNER));
-  bc_types.add_bc_newton(BDY_BOTTOM);
-
-  // Enter Dirichlet boudnary values.
-  BCValues bc_values;
-  bc_values.add_const(BDY_LEFT, T1);
+  // Initialize boundary conditions
+  DefaultEssentialBCConst bc_essential(BDY_LEFT, T1);
+  EssentialBCs bcs(&bc_essential);
 
   // Create an H1 space with default shapeset.
-  H1Space space(&mesh, &bc_types, &bc_values, P_INIT);
+  H1Space space(&mesh, &bcs, P_INIT);
   int ndof = Space::get_num_dofs(&space);
   info("ndof = %d", ndof);
 
   // Initialize the weak formulation.
-  WeakForm wf;
-  wf.add_matrix_form(callback(bilinear_form));
-  wf.add_matrix_form_surf(callback(bilinear_form_surf), BDY_BOTTOM);
-  wf.add_vector_form_surf(callback(linear_form_surf), BDY_BOTTOM);
+  CustomWeakFormPoissonNewton wf(h, T0, BDY_BOTTOM);
 
   // Initialize the FE problem.
   bool is_linear = true;

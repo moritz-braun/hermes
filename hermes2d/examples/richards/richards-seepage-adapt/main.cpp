@@ -34,10 +34,9 @@ const int TIME_INTEGRATION = 2;                   // 1... implicit Euler, 2... C
 
 // Adaptivity
 const int UNREF_FREQ = 1;                         // Every UNREF_FREQth time step the mesh is unrefined.
-const int UNREF_LEVEL = 1;                        // 1 = one layer of refinements is shaved off and poly degrees
-                                                  // of all elements reset to P_INIT; 2 = mesh reset to basemesh.  
-                                                  // TODO: Add a third option where one layer will be taken off 
-                                                  // and just one polynomial degree subtracted.
+const int UNREF_METHOD = 3;                       // 1... mesh reset to basemesh and poly degrees to P_INIT.   
+                                                  // 2... one ref. layer shaved off, poly degrees reset to P_INIT.
+                                                  // 3... one ref. layer shaved off, poly degrees decreased by one. 
 const double THRESHOLD = 0.3;                     // This is a quantitative parameter of the adapt(...) function and
                                                   // it has different meanings for various adaptive strategies (see below).
 const int STRATEGY = 1;                           // Adaptive strategy:
@@ -189,7 +188,7 @@ int main(int argc, char* argv[])
   for(int i = 0; i < INIT_REF_NUM; i++) mesh.refine_all_elements();
   mesh.refine_towards_boundary(BDY_3, INIT_REF_NUM_BDY);
 
-  // Enter boundary markers.
+  // Initialize boundary conditions.
   BCTypes bc_types;
   bc_types.add_bc_dirichlet(BDY_3);
   bc_types.add_bc_neumann(Hermes::vector<int>(BDY_2, BDY_5));
@@ -227,7 +226,7 @@ int main(int argc, char* argv[])
   do
   {
     // Setup space for the reference solution.
-    Space *rspace = construct_refined_space(&init_space);
+    Space *rspace = Space::construct_refined_space(&init_space);
 
     // Assign the function f() to the fine mesh.
     ref_sln.set_exact(rspace->get_mesh(), init_cond);
@@ -313,9 +312,21 @@ int main(int argc, char* argv[])
     if (ts > 1 && ts % UNREF_FREQ == 0) 
     {
       info("Global mesh derefinement.");
-      if (UNREF_LEVEL == 1) mesh.unrefine_all_elements();
-      else mesh.copy(&basemesh);
-      space.set_uniform_order(P_INIT);
+      switch (UNREF_METHOD) {
+        case 1: mesh.copy(&basemesh);
+                space.set_uniform_order(P_INIT);
+                break;
+        case 2: mesh.unrefine_all_elements();
+                space.set_uniform_order(P_INIT);
+                break;
+        case 3: mesh.unrefine_all_elements();
+                //space.adjust_element_order(-1, P_INIT);
+                space.adjust_element_order(-1, -1, P_INIT, P_INIT);
+                break;
+        default: error("Wrong global derefinement method.");
+      }
+
+      ndof = Space::get_num_dofs(&space);
     }
 
     // Spatial adaptivity loop. Note; sln_prev_time must not be changed 
@@ -328,7 +339,7 @@ int main(int argc, char* argv[])
 
       // Construct globally refined reference mesh
       // and setup reference space.
-      Space* ref_space = construct_refined_space(&space);
+      Space* ref_space = Space::construct_refined_space(&space);
 
       scalar* coeff_vec = new scalar[Space::get_num_dofs(ref_space)];
      

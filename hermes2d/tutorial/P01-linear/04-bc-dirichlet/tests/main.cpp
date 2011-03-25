@@ -4,61 +4,42 @@
 // CAUTION: This test will fail when any changes to the shapeset
 // are made, but it is easy to fix (see below).
 
-double CONST_F = -4.0;                            // constant right-hand side.
 int P_INIT = 2;                                   // Initial polynomial degree in all elements.
+const int INIT_REF_NUM = 0;                       // Number of initial uniform mesh refinements.
 MatrixSolverType matrix_solver = SOLVER_UMFPACK;  // Possibilities: SOLVER_AMESOS, SOLVER_AZTECOO, SOLVER_MUMPS,
                                                   // SOLVER_PETSC, SOLVER_SUPERLU, SOLVER_UMFPACK.
 
-// Boundary markers.
-const int BDY_BOTTOM = 1, BDY_OUTER = 2, BDY_LEFT = 3, BDY_INNER = 4;
+// Problem parameters.
+double CONST_F = -4.0;                            // constant right-hand side.
 
-// Essential (Dirichlet) boundary condition values.
-scalar essential_bc_values(double x, double y)
-{
-  return (-CONST_F/4.0)*(x*x + y*y);
-}
-
-// return the value \int \nabla u . \nabla v dx .
-template<typename Real, typename Scalar>
-Scalar bilinear_form(int n, double *wt, Func<Scalar> *u_ext[], 
-Func<Real> *u, Func<Real> *v, Geom<Real> *e, ExtData<Scalar> *ext)
-{
-  return int_grad_u_grad_v<Real, Scalar>(n, wt, u, v);
-}
-
-// return the value \int v dx .
-template<typename Real, typename Scalar>
-Scalar linear_form(int n, double *wt, Func<Scalar> *u_ext[], 
-Func<Real> *v, Geom<Real> *e, ExtData<Scalar> *ext)
-{
-  return CONST_F*int_v<Real, Scalar>(n, wt, v);
-}
+// Weak forms.
+#include "../definitions.cpp"
 
 int main(int argc, char* argv[])
 {
   // Load the mesh.
   Mesh mesh;
   H2DReader mloader;
-  mloader.load("domain.mesh", &mesh);
+  mloader.load("../domain.mesh", &mesh);
   mesh.refine_all_elements();
 
-  // Enter boundary markers.
-  BCTypes bc_types;
-  bc_types.add_bc_dirichlet(Hermes::vector<int>(BDY_BOTTOM, BDY_OUTER, BDY_LEFT, BDY_INNER));
+  // Perform initial mesh refinements.
+  for(int i=0; i < INIT_REF_NUM; i++) mesh.refine_all_elements();
 
-  // Enter Dirichlet boudnary values.
-  BCValues bc_values;
-  bc_values.add_function(Hermes::vector<int>(BDY_BOTTOM, BDY_OUTER, BDY_LEFT, BDY_INNER), essential_bc_values);
-
-  // Create an H1 space with default shapeset.
-  H1Space space(&mesh, &bc_types, &bc_values, P_INIT);
-  int ndof = Space::get_num_dofs(&space);
-  info("ndof = %d", ndof);
+  // Set exact solution.
+  CustomExactSolution exact(&mesh, CONST_F);
 
   // Initialize the weak formulation.
-  WeakForm wf;
-  wf.add_matrix_form(callback(bilinear_form));
-  wf.add_vector_form(callback(linear_form));
+  CustomWeakFormPoisson wf(CONST_F);
+
+  // Initialize boundary conditions
+  DefaultEssentialBCNonConst bc_essential("Dirichlet", &exact);
+  EssentialBCs bcs(&bc_essential);
+
+  // Create an H1 space with default shapeset.
+  H1Space space(&mesh, &bcs, P_INIT);
+  int ndof = space.get_num_dofs();
+  info("ndof = %d", ndof);
 
   // Testing n_dof and correctness of solution vector
   // for p_init = 1, 2, ..., 10

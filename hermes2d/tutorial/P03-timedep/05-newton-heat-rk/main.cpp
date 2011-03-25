@@ -14,7 +14,7 @@ using namespace RefinementSelectors;
 //  For a list of available R-K methods see the file hermes_common/tables.h.
 //
 //  The function rk_time_step() needs more optimisation, see a todo list at 
-//  the beginning of file src/runge-kutta.cpp.
+//  the beginning of file src/runge-kutta.H.
 //
 //  PDE: time-dependent heat transfer equation with nonlinear thermal
 //  conductivity, du/dt - div[lambda(u)grad u] = f.
@@ -43,7 +43,7 @@ MatrixSolverType matrix_solver = SOLVER_UMFPACK;   // Possibilities: SOLVER_AMES
 // Implicit methods: 
 //   Implicit_RK_1, Implicit_Crank_Nicolson_2_2, Implicit_SIRK_2_2, Implicit_ESIRK_2_2, Implicit_SDIRK_2_2, 
 //   Implicit_Lobatto_IIIA_2_2, Implicit_Lobatto_IIIB_2_2, Implicit_Lobatto_IIIC_2_2, Implicit_Lobatto_IIIA_3_4, 
-//   Implicit_Lobatto_IIIB_3_4, Implicit_Lobatto_IIIC_3_4, Implicit_Radau_IIA_3_5, Implicit_SDIRK_4_5.
+//   Implicit_Lobatto_IIIB_3_4, Implicit_Lobatto_IIIC_3_4, Implicit_Radau_IIA_3_5, Implicit_SDIRK_5_4.
 // Embedded explicit methods:
 //   Explicit_HEUN_EULER_2_12_embedded, Explicit_BOGACKI_SHAMPINE_4_23_embedded, Explicit_FEHLBERG_6_45_embedded,
 //   Explicit_CASH_KARP_6_45_embedded, Explicit_DORMAND_PRINCE_7_45_embedded.
@@ -53,11 +53,15 @@ MatrixSolverType matrix_solver = SOLVER_UMFPACK;   // Possibilities: SOLVER_AMES
 //   Implicit_DIRK_ISMAIL_7_45_embedded. 
 ButcherTableType butcher_table_type = Implicit_RK_1;
 
-// Model parameters.
-#include "model.cpp"
+const double ALPHA = 4.0;                         // For the nonlinear thermal conductivity.
+
+const std::string BDY_DIRICHLET = "1";
 
 // Weak forms.
 #include "forms.cpp"
+
+// Initial condition.
+#include "initial_condition.cpp"
 
 // Main function.
 int main(int argc, char* argv[])
@@ -77,37 +81,35 @@ int main(int argc, char* argv[])
   for(int i = 0; i < INIT_GLOB_REF_NUM; i++) mesh.refine_all_elements();
   mesh.refine_towards_boundary(BDY_DIRICHLET, INIT_BDY_REF_NUM);
 
-  // Enter boundary markers.
-  BCTypes bc_types;
-  bc_types.add_bc_dirichlet(BDY_DIRICHLET);
-
-  // Enter Dirichlet boundary values.
-  BCValues bc_values;
-  bc_values.add_function(BDY_DIRICHLET, essential_bc_values);   
+  // Initialize boundary conditions.
+  EssentialBCNonConst bc_essential(BDY_DIRICHLET);
+  EssentialBCs bcs(&bc_essential);
 
   // Create an H1 space with default shapeset.
-  H1Space* space = new H1Space(&mesh, &bc_types, &bc_values, P_INIT);
-
-  int ndof = Space::get_num_dofs(space);
+  H1Space space(&mesh, &bcs, P_INIT);
+  int ndof = space.get_num_dofs();
   info("ndof = %d.", ndof);
 
-  // Previous and next time level solutions.
-  Solution* sln_time_prev = new Solution(&mesh, init_cond);
-  Solution* sln_time_new = new Solution(&mesh);
+  // Previous time level solution (initialized by the initial condition).
+  InitialSolutionHeatTransfer sln_time_prev(&mesh);
 
-  // Initialize the weak formulation.
-  WeakForm wf;
-  wf.add_matrix_form(callback(stac_jacobian), HERMES_NONSYM, HERMES_ANY, sln_time_prev);
-  wf.add_vector_form(callback(stac_residual), HERMES_ANY, sln_time_prev);
+  // Initialize the weak formulation
+  WeakFormHeatTransferRungeKuttaTimedep wf(ALPHA, &sln_time_prev);
+
+  // Previous and next time level solutions.
+  Solution sln_time_new(&mesh);
 
   // Initialize the FE problem.
   bool is_linear = false;
-  DiscreteProblem dp(&wf, space, is_linear);
+  DiscreteProblem dp(&wf, &space, is_linear);
+
+  // Initialize Runge-Kutta time stepping.
+  RungeKutta runge_kutta(&dp, &bt, matrix_solver);
 
   // Initialize views.
   ScalarView sview("Solution", new WinGeom(0, 0, 500, 400));
   OrderView oview("Mesh", new WinGeom(510, 0, 460, 400));
-  oview.show(space);
+  oview.show(&space);
 
   // Time stepping loop:
   double current_time = 0; int ts = 1;
@@ -117,9 +119,12 @@ int main(int argc, char* argv[])
     info("Runge-Kutta time step (t = %g s, tau = %g s, stages: %d).", 
          current_time, time_step, bt.get_size());
     bool verbose = true;
-    bool is_linear = false;
-    if (!rk_time_step(current_time, time_step, &bt, sln_time_prev, sln_time_new, &dp, matrix_solver,
-		      verbose, is_linear, NEWTON_TOL, NEWTON_MAX_ITER)) {
+    Hermes::vector<Solution*> slns_time_prev;
+    slns_time_prev.push_back(&sln_time_prev);
+    Hermes::vector<Solution*> slns_time_new;
+    slns_time_new.push_back(&sln_time_new);
+
+    if (!runge_kutta.rk_time_step(current_time, time_step, slns_time_prev, slns_time_new, true, verbose, NEWTON_TOL, NEWTON_MAX_ITER)) {
       error("Runge-Kutta time step failed, try to decrease time step size.");
     }
 
@@ -130,21 +135,16 @@ int main(int argc, char* argv[])
     char title[100];
     sprintf(title, "Solution, t = %g", current_time);
     sview.set_title(title);
-    sview.show(sln_time_new, HERMES_EPS_VERYHIGH);
-    oview.show(space);
+    sview.show(&sln_time_new, HERMES_EPS_VERYHIGH);
+    oview.show(&space);
 
     // Copy solution for the new time step.
-    sln_time_prev->copy(sln_time_new);
+    sln_time_prev.copy(&sln_time_new);
 
     // Increase counter of time steps.
     ts++;
   } 
   while (current_time < T_FINAL);
-
-  // Cleanup.
-  delete space;
-  delete sln_time_prev;
-  delete sln_time_new;
 
   // Wait for all views to be closed.
   View::wait();

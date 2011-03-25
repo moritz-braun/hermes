@@ -133,28 +133,30 @@ void DiscreteProblem::process_vol_forms(SparseMatrix *mat, Vector *rhs, bool rhs
     // volumetric part of residual
     for (unsigned int ww = 0; ww < this->wf->vector_forms_vol.size(); ww++) {
       WeakForm::VectorFormVol *vfv = &this->wf->vector_forms_vol[ww];
-      int c_i = vfv->i;  
-      // loop over test functions (rows)
-      for(int i=0; i<e->p + 1; i++) {
-        // if i-th test function is active
-        int pos_i = e->dof[c_i][i]; // row in residual vector
-        if(pos_i != -1) {
-          // transform i-th test function to element 'm'
-          element_shapefn(e->x1, e->x2,  
-		      i, order, phys_v, phys_dvdx); 
-          // contribute to residual vector
-          double val_i = vfv->fn(pts_num, phys_pts, phys_weights, 
-			       phys_u_prev, phys_du_prevdx, phys_v,
-             phys_dvdx, vfv->space);
-          // truncating
-          if(fabs(val_i) < 1e-12) val_i = 0.0; 
-          // add the contribution to the residual vector
-          if (val_i != 0 && rhs != NULL) rhs->add(pos_i, val_i);
-          if (DEBUG_MATRIX)
-	          if (val_i != 0) {
-	            info("Adding to residual pos %d value %g (comp %d)", 
-                  pos_i, val_i, c_i);
-              }
+      if (e->marker == vfv->marker ||  vfv->marker == ANY) {
+        int c_i = vfv->i;  
+        // loop over test functions (rows)
+        for(int i=0; i<e->p + 1; i++) {
+          // if i-th test function is active
+          int pos_i = e->dof[c_i][i]; // row in residual vector
+          if(pos_i != -1) {
+            // transform i-th test function to element 'm'
+            element_shapefn(e->x1, e->x2,  
+		        i, order, phys_v, phys_dvdx); 
+            // contribute to residual vector
+            double val_i = vfv->fn(pts_num, phys_pts, phys_weights, 
+			         phys_u_prev, phys_du_prevdx, phys_v,
+               phys_dvdx, vfv->space);
+            // truncating
+            if(fabs(val_i) < 1e-12) val_i = 0.0; 
+            // add the contribution to the residual vector
+            if (val_i != 0 && rhs != NULL) rhs->add(pos_i, val_i);
+            if (DEBUG_MATRIX)
+	            if (val_i != 0) {
+	              info("Adding to residual pos %d value %g (comp %d)", 
+                    pos_i, val_i, c_i);
+                }
+          }
         }
       }
     }
@@ -270,7 +272,8 @@ void DiscreteProblem::process_surf_forms(SparseMatrix *mat, Vector *rhs, int bdy
 }
 
 // construct Jacobi matrix or residual vector
-void DiscreteProblem::assemble(scalar *coeff_vec, SparseMatrix *mat, Vector *rhs, bool rhsonly) {
+void DiscreteProblem::assemble(scalar *coeff_vec, SparseMatrix *mat, Vector *rhs, bool rhsonly,
+                               bool force_diagonal_blocks, bool add_dir_lift, Table* block_weights) {
   // number of equations in the system
   int n_eq = space->get_n_eq();
 
@@ -484,4 +487,6 @@ int DiscreteProblem::get_num_dofs() { return space->get_num_dofs(); };
   
 bool DiscreteProblem::is_matrix_free() { return false; };
 
-void DiscreteProblem::create_sparse_structure(SparseMatrix* matrix) { return; };
+// Signature of this function is identical in H1D, H2D, H3D, but it is currently unused in H1D.
+void DiscreteProblem::create_sparse_structure(SparseMatrix* matrix, Vector* rhs, bool rhsonly,
+                                              bool force_diagonal_blocks, Table* block_weights) { return; };

@@ -40,7 +40,7 @@ const int P_INIT_LSET = 1;
 const int BDY_DIRICHLET = 1;
 
 // Weak forms.
-#include "forms.cpp"
+#include "../forms.cpp"
 
 scalar exactfn(double x, double y, scalar& dx , scalar& dy) { 
 /*  dx=-1; dy=0; //return (y<.48) ? -1 : 1;
@@ -312,17 +312,17 @@ int main(int argc, char* argv[])
   // Load the mesh file.
   Mesh mesh1;
   H2DReader mloader;
-  mloader.load("square_quad.mesh", &mesh1);
+  mloader.load("../square_quad.mesh", &mesh1);
   mesh1.refine_all_elements();
   mesh1.refine_all_elements();
   mesh1.refine_all_elements();
 
   Mesh mesh2;
-  mloader.load("square_quad.mesh", &mesh2);
+  mloader.load("../square_quad.mesh", &mesh2);
   mesh2.refine_all_elements();
   mesh2.refine_all_elements();
 
-  // Enter boundary markers.
+  // Initialize boundary conditions.
   BCTypes bc_types;
   bc_types.add_bc_dirichlet(BDY_DIRICHLET);
 
@@ -411,7 +411,7 @@ int main(int argc, char* argv[])
     info("---- Adaptivity step %d:", as);
 
     // Construct globally refined reference mesh and setup reference space.
-    Hermes::vector<Space *>* ref_spaces = construct_refined_spaces(Hermes::vector<Space *>(&xvel, &yvel, &press, &lset));
+    Hermes::vector<Space *>* ref_spaces = Space::construct_refined_spaces(Hermes::vector<Space *>(&xvel, &yvel, &press, &lset));
 
     // Assemble the reference problem.
     info("Solving on reference mesh.");

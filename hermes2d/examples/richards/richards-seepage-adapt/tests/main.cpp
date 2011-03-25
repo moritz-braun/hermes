@@ -148,7 +148,7 @@ scalar essential_bc_values(double x, double y, double time)
 }
 
 // Weak forms.
-#include "forms.cpp"
+#include "../forms.cpp"
 
 int main(int argc, char* argv[])
 {
@@ -159,14 +159,14 @@ int main(int argc, char* argv[])
   // Load the mesh.
   Mesh mesh, basemesh;
   H2DReader mloader;
-  mloader.load("domain.mesh", &basemesh);
+  mloader.load("../domain.mesh", &basemesh);
 
   // Perform initial mesh refinements.
   mesh.copy(&basemesh);
   for(int i = 0; i < INIT_REF_NUM; i++) mesh.refine_all_elements();
   mesh.refine_towards_boundary(BDY_3, INIT_REF_NUM_BDY);
 
-  // Enter boundary markers.
+  // Initialize boundary conditions.
   BCTypes bc_types;
   bc_types.add_bc_dirichlet(BDY_3);
   bc_types.add_bc_neumann(Hermes::vector<int>(BDY_2, BDY_5));
@@ -197,7 +197,7 @@ int main(int argc, char* argv[])
   do
   {
     // Setup space for the reference solution.
-    Space *rspace = construct_refined_space(&init_space);
+    Space *rspace = Space::construct_refined_space(&init_space);
 
     // Assign the function f() to the fine mesh.
     ref_sln.set_exact(rspace->get_mesh(), init_cond);
@@ -284,7 +284,7 @@ int main(int argc, char* argv[])
 
       // Construct globally refined reference mesh
       // and setup reference space.
-      Space* ref_space = construct_refined_space(&space);
+      Space* ref_space = Space::construct_refined_space(&space);
 
       scalar* coeff_vec = new scalar[Space::get_num_dofs(ref_space)];
      

@@ -87,7 +87,7 @@ scalar essential_bc_values_T(double x, double y, double time)
 }
 
 // Weak forms.
-#include "forms.cpp"
+#include "../forms.cpp"
 
 int main(int argc, char* argv[])
 {
@@ -98,14 +98,14 @@ int main(int argc, char* argv[])
   // Load the mesh.
   Mesh basemesh, T_mesh, M_mesh;
   H2DReader mloader;
-  mloader.load("domain2.mesh", &basemesh);
+  mloader.load("../domain2.mesh", &basemesh);
 
   // Create temperature and moisture meshes.
   // This also initializes the multimesh hp-FEM.
   T_mesh.copy(&basemesh);
   M_mesh.copy(&basemesh);
 
-  // Enter boundary markers.
+  // Initialize boundary conditions.
   BCTypes temp_bc_type, moist_bc_type;
   temp_bc_type.add_bc_dirichlet(BDY_REACTOR_WALL);
   temp_bc_type.add_bc_neumann(BDY_SYMMETRY);
@@ -173,7 +173,7 @@ int main(int argc, char* argv[])
       info("---- Adaptivity step %d:", as);
 
       // Construct globally refined reference mesh and setup reference space.
-      Hermes::vector<Space *>* ref_spaces = construct_refined_spaces(Hermes::vector<Space *>(&T_space, &M_space));
+      Hermes::vector<Space *>* ref_spaces = Space::construct_refined_spaces(Hermes::vector<Space *>(&T_space, &M_space));
 
       // Assemble the reference problem.
       info("Solving on reference mesh.");

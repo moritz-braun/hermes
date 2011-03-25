@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
   ymesh.copy(&xmesh);                  // Ydisp will share master mesh with xdisp.
   tmesh.copy(&xmesh);                  // Temp will share master mesh with xdisp.
 
-  // Enter boundary markers.
+  // Initialize boundary conditions.
   BCTypes bc_types_x_y;
   bc_types_x_y.add_bc_dirichlet(BDY_BOTTOM);
   bc_types_x_y.add_bc_neumann(Hermes::vector<int>(BDY_SIDES, BDY_TOP, BDY_HOLES));
@@ -156,7 +156,7 @@ int main(int argc, char* argv[])
     info("---- Adaptivity step %d:", as);
 
     // Construct globally refined reference mesh and setup reference space.
-    Hermes::vector<Space *>* ref_spaces = construct_refined_spaces(Hermes::vector<Space *>(&xdisp, &ydisp, &temp));
+    Hermes::vector<Space *>* ref_spaces = Space::construct_refined_spaces(Hermes::vector<Space *>(&xdisp, &ydisp, &temp));
 
     // Assemble the reference problem.
     info("Solving on reference mesh.");

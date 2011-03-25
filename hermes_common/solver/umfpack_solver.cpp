@@ -281,14 +281,17 @@ bool CSCMatrix::dump(FILE *file, const char *var_name, EMatrixDumpFormat fmt) {
       fprintf(file,"%d %d %d\n", size, size, nnz_sym);
       for (int j = 0; j < (int)size; j++)
         for (int i = Ap[j]; i < Ap[j + 1]; i++)
-          if (j <= Ai[i]) fprintf(file, "%d %d %24.15e\n", Ai[i]+1, j+1, Ax[i]);
+          // The following line was replaced with the one below, because it gave a warning 
+	  // to cause code abort at runtime. 
+          //if (j <= Ai[i]) fprintf(file, "%d %d %24.15e\n", Ai[i]+1, j+1, Ax[i]);
+          if (j <= Ai[i]) fprintf(file, "%d %d " SCALAR_FMT "\n", Ai[i] + 1, j + 1, SCALAR(Ax[i]));
 
       return true;
     }
 
     case DF_HERMES_BIN: 
     {
-      hermes_fwrite("H3DX\001\000\000\000", 1, 8, file);
+      hermes_fwrite("HERMESX\001", 1, 8, file);
       int ssize = sizeof(scalar);
       hermes_fwrite(&ssize, sizeof(int), 1, file);
       hermes_fwrite(&size, sizeof(int), 1, file);
@@ -425,7 +428,7 @@ bool UMFPackVector::dump(FILE *file, const char *var_name, EMatrixDumpFormat fmt
 
     case DF_HERMES_BIN: 
     {
-      hermes_fwrite("H3DR\001\000\000\000", 1, 8, file);
+      hermes_fwrite("HERMESR\001", 1, 8, file);
       int ssize = sizeof(scalar);
       hermes_fwrite(&ssize, sizeof(int), 1, file);
       hermes_fwrite(&size, sizeof(int), 1, file);
@@ -444,7 +447,7 @@ bool UMFPackVector::dump(FILE *file, const char *var_name, EMatrixDumpFormat fmt
 
 // UMFPack solver //////
 
-#if !defined (H2D_COMPLEX) && !defined (H3D_COMPLEX)
+#ifndef HERMES_COMMON_COMPLEX
   // real case
   #define umfpack_symbolic(m, n, Ap, Ai, Ax, S, C, I)   umfpack_di_symbolic(m, n, Ap, Ai, Ax, S, C, I)
   #define umfpack_numeric(Ap, Ai, Ax, S, N, C, I)       umfpack_di_numeric(Ap, Ai, Ax, S, N, C, I)

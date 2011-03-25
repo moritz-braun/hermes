@@ -1,50 +1,68 @@
-// Exact solution u(x,y) = U(x)*U(y) and its derivatives.
-double U(double t) {
-  return cos(M_PI*t/2);
-}
-double dUdt(double t) {
-  return -sin(M_PI*t/2)*(M_PI/2.);
-}
-double ddUdtt(double t) {
-  return -cos(M_PI*t/2)*(M_PI/2.)*(M_PI/2.);
-}
-static double uexact(double x, double y, double& dx, double& dy)
+class ExactSolutionFitzHughNagumo1 : public ExactSolutionScalar
 {
-  dx = dUdt(x)*U(y);
-  dy = U(x)*dUdt(y);
-  return U(x)*U(y);
-}
+public:
+  ExactSolutionFitzHughNagumo1(Mesh* mesh, double sigma, double d_u) : ExactSolutionScalar(mesh), sigma(sigma),
+                                                                    d_u(d_u) {
+  }
 
-// Exact solution v(x,y) = V(x)*V(y).
-double V(double t) {
-  return 1. - (exp(K*t) + exp(-K*t))/(exp(K) + exp(-K));
-}
-double dVdt(double t) {
-  return -K*(exp(K*t) - exp(-K*t))/(exp(K) + exp(-K));
-}
-double ddVdtt(double t) {
-  return -K*K*(exp(K*t) + exp(-K*t))/(exp(K) + exp(-K));
-}
-static double vexact(double x, double y, double& dx, double& dy)
-{
-  dx = dVdt(x)*V(y);
-  dy = V(x)*dVdt(y);
-  return V(x)*V(y);
-}
+  virtual scalar value (double x, double y) const {
+    return U(x)*U(y);
+  }
 
-// Right-hand side functions g_1 and g_2.
-double g_1(double x, double y)
-{
-  double Laplace_u = ddUdtt(x)*U(y) + U(x)*ddUdtt(y);
-  double u = U(x)*U(y);
-  double v = V(x)*V(y);
-  return -D_u*D_u * Laplace_u - u + SIGMA*v;
-}
+  virtual void derivatives (double x, double y, scalar& dx, scalar& dy) const {
+    dx = dUdt(x)*U(y);
+    dy = U(x)*dUdt(y);
+  }
 
-double g_2(double x, double y)
+  virtual Ord ord(Ord x, Ord y) const {
+    return Ord(20);
+  }
+
+  double U(double t) {
+    return cos(M_PI*t/2);
+  }
+  double dUdt(double t) {
+    return -sin(M_PI*t/2)*(M_PI/2.);
+  }
+  double ddUdtt(double t) {
+    return -cos(M_PI*t/2)*(M_PI/2.)*(M_PI/2.);
+  }
+
+  // Members.
+  double sigma;
+  double d_u;
+};
+
+
+class ExactSolutionFitzHughNagumo2 : public ExactSolutionScalar
 {
-  double Laplace_v = ddVdtt(x)*V(y) + V(x)*ddVdtt(y);
-  double u = U(x)*U(y);
-  double v = V(x)*V(y);
-  return -D_v*D_v * Laplace_v - u + v;
-}
+public:
+  ExactSolutionFitzHughNagumo2(Mesh* mesh, double K, double d_v) : ExactSolutionScalar(mesh), K(K), d_v(d_v) {
+  }
+  virtual scalar value (double x, double y) const {
+    return V(x)*V(y);
+  }
+
+  virtual void derivatives (double x, double y, scalar& dx, scalar& dy) const {
+    dx = dVdt(x)*V(y);
+    dy = V(x)*dVdt(y);
+  }
+
+  virtual Ord ord(Ord x, Ord y) const {
+    return Ord(20);
+  }
+
+  double V(double t) {
+    return 1. - (exp(K*t) + exp(-K*t))/(exp(K) + exp(-K));
+  }
+  double dVdt(double t) {
+    return -K*(exp(K*t) - exp(-K*t))/(exp(K) + exp(-K));
+  }
+  double ddVdtt(double t) {
+    return -K*K*(exp(K*t) + exp(-K*t))/(exp(K) + exp(-K));
+  }
+  
+  // Members.
+  double K;
+  double d_v;
+};

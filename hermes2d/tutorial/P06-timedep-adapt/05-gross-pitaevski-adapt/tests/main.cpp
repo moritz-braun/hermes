@@ -73,20 +73,23 @@ scalar init_cond(double x, double y, scalar& dx, scalar& dy)
 const int BDY_BOTTOM = 1, BDY_RIGHT = 2, BDY_TOP = 3, BDY_LEFT = 4;
 
 // Weak forms.
-# include "forms.cpp"
+# include "../forms.cpp"
 
 int main(int argc, char* argv[])
 {
+  // Instantiate a class with global functions.
+  Hermes2D hermes2d;
+
   // Load the mesh.
   Mesh mesh, basemesh;
   H2DReader mloader;
-  mloader.load("square.mesh", &basemesh);
+  mloader.load("../square.mesh", &basemesh);
 
   // Perform initial mesh refinements.
   for(int i = 0; i < INIT_REF_NUM; i++) basemesh.refine_all_elements();
   mesh.copy(&basemesh);
 
-  // Enter boundary markers.
+  // Initialize boundary conditions.
   BCTypes bc_types;
   bc_types.add_bc_dirichlet(Hermes::vector<int>(BDY_BOTTOM, BDY_RIGHT, BDY_TOP, BDY_LEFT));
 
@@ -140,7 +143,7 @@ int main(int argc, char* argv[])
   // Newton's loop on the coarse mesh.
   info("Solving on coarse mesh:");
   bool verbose = true;
-  if (!solve_newton(coeff_vec_coarse, &dp_coarse, solver_coarse, matrix_coarse, rhs_coarse, 
+  if (!hermes2d.solve_newton(coeff_vec_coarse, &dp_coarse, solver_coarse, matrix_coarse, rhs_coarse, 
       NEWTON_TOL_COARSE, NEWTON_MAX_ITER, verbose)) error("Newton's iteration failed.");
 
   // Translate the resulting coefficient vector into the Solution sln.
@@ -176,7 +179,7 @@ int main(int argc, char* argv[])
 
       // Construct globally refined reference mesh
       // and setup reference space.
-      Space* ref_space = construct_refined_space(&space);
+      Space* ref_space = Space::construct_refined_space(&space);
 
       scalar* coeff_vec = new scalar[Space::get_num_dofs(ref_space)];
       DiscreteProblem* dp = new DiscreteProblem(&wf, ref_space, is_linear);
@@ -199,7 +202,7 @@ int main(int argc, char* argv[])
 
       // Newton's loop on the fine mesh.
       info("Solving on fine mesh:");
-      if (!solve_newton(coeff_vec, dp, solver, matrix, rhs, 
+      if (!hermes2d.solve_newton(coeff_vec, dp, solver, matrix, rhs, 
 	  	        NEWTON_TOL_FINE, NEWTON_MAX_ITER, verbose)) error("Newton's iteration failed.");
 
       // Store the result in ref_sln.

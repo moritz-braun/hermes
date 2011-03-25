@@ -18,21 +18,15 @@
 // You can change the constant right-hand side CONST_F, the
 // initial polynomial degree P_INIT, and play with various initial
 // mesh refinements at the beginning of the main() function.
-
+const double CONST_F = 2.0;
 const bool HERMES_VISUALIZATION = true;           // Set to "false" to suppress Hermes OpenGL visualization. 
-const bool VTK_OUTPUT = true;                     // Set to "true" to enable VTK output.
+const bool VTK_VISUALIZATION = true;              // Set to "true" to enable VTK output.
 const int P_INIT = 3;                             // Uniform polynomial degree of mesh elements.
 MatrixSolverType matrix_solver = SOLVER_UMFPACK;  // Possibilities: SOLVER_AMESOS, SOLVER_AZTECOO, SOLVER_MUMPS,
                                                   // SOLVER_PETSC, SOLVER_SUPERLU, SOLVER_UMFPACK.
 
-// Boundary markers.
-const int BDY_BOTTOM = 1, BDY_OUTER = 2, BDY_LEFT = 3, BDY_INNER = 4;
-
-// Problem parameters.
-const double CONST_F = 2.0;  
-
 // Weak forms.
-#include "forms.cpp"
+#include "definitions.cpp"
 
 int main(int argc, char* argv[])
 {
@@ -44,22 +38,17 @@ int main(int argc, char* argv[])
   // Perform initial mesh refinements (optional).
   //mesh.refine_all_elements();
 
-  // Enter boundary markers.
-  BCTypes bc_types;
-  bc_types.add_bc_dirichlet(Hermes::vector<int>(BDY_BOTTOM, BDY_OUTER, BDY_LEFT, BDY_INNER));
-
-  // Enter zero Dirichlet boundary values.
-  BCValues bc_values;
+  // Initialize the weak formulation.
+  CustomWeakFormPoisson wf(CONST_F);
+  
+  // Initialize boundary conditions.
+  DefaultEssentialBCConst bc_essential("Dirichlet", 0.0);
+  EssentialBCs bcs(&bc_essential);
 
   // Create an H1 space with default shapeset.
-  H1Space space(&mesh, &bc_types, &bc_values, P_INIT);
-  int ndof = Space::get_num_dofs(&space);
+  H1Space space(&mesh, &bcs, P_INIT);
+  int ndof = space.get_num_dofs();
   info("ndof = %d", ndof);
-
-  // Initialize the weak formulation.
-  WeakForm wf;
-  wf.add_matrix_form(callback(bilinear_form));
-  wf.add_vector_form(callback(linear_form));
 
   // Initialize the FE problem.
   bool is_linear = true;
@@ -83,7 +72,7 @@ int main(int argc, char* argv[])
   else error ("Matrix solver failed.\n");
 
   // VTK output.
-  if (VTK_OUTPUT) {
+  if (VTK_VISUALIZATION) {
     // Output solution in VTK format.
     Linearizer lin;
     bool mode_3D = true;

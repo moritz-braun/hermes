@@ -32,10 +32,9 @@ const double T_FINAL = 2.0;                       // Time interval length.
 
 // Spatial adaptivity.
 const int UNREF_FREQ = 1;                         // Every UNREF_FREQth time step the mesh is derefined.
-const int UNREF_LEVEL = 1;                        // 1 = one layer of refinements is shaved off and poly degrees
-                                                  // of all elements reset to P_INIT; 2 = mesh reset to basemesh.  
-                                                  // TODO: Add a third option where one layer will be taken off 
-                                                  // and just one polynomial degree subtracted.
+const int UNREF_METHOD = 3;                       // 1... mesh reset to basemesh and poly degrees to P_INIT.   
+                                                  // 2... one ref. layer shaved off, poly degrees reset to P_INIT.
+                                                  // 3... one ref. layer shaved off, poly degrees decreased by one. 
 const double THRESHOLD = 0.3;                     // This is a quantitative parameter of the adapt(...) function and
                                                   // it has different meanings for various adaptive strategies (see below).
 const int STRATEGY = 0;                           // Adaptive strategy:
@@ -89,7 +88,7 @@ const int NEWTON_MAX_ITER = 20;                   // Maximum allowed number of N
 // Implicit methods: 
 //   Implicit_RK_1, Implicit_Crank_Nicolson_2_2, Implicit_SIRK_2_2, Implicit_ESIRK_2_2, Implicit_SDIRK_2_2, 
 //   Implicit_Lobatto_IIIA_2_2, Implicit_Lobatto_IIIB_2_2, Implicit_Lobatto_IIIC_2_2, Implicit_Lobatto_IIIA_3_4, 
-//   Implicit_Lobatto_IIIB_3_4, Implicit_Lobatto_IIIC_3_4, Implicit_Radau_IIA_3_5, Implicit_SDIRK_4_5.
+//   Implicit_Lobatto_IIIB_3_4, Implicit_Lobatto_IIIC_3_4, Implicit_Radau_IIA_3_5, Implicit_SDIRK_5_4.
 // Embedded explicit methods:
 //   Explicit_HEUN_EULER_2_12_embedded, Explicit_BOGACKI_SHAMPINE_4_23_embedded, Explicit_FEHLBERG_6_45_embedded,
 //   Explicit_CASH_KARP_6_45_embedded, Explicit_DORMAND_PRINCE_7_45_embedded.
@@ -107,6 +106,9 @@ ButcherTableType butcher_table_type = Implicit_SDIRK_CASH_3_23_embedded;
 
 int main(int argc, char* argv[])
 {
+  // Instantiate a class with global functions.
+  Hermes2D hermes2d;
+
   // Choose a Butcher's table or define your own.
   ButcherTable* bt = new ButcherTable(butcher_table_type);
   if (bt->is_explicit()) info("Using a %d-stage explicit R-K method.", bt->get_size());
@@ -128,7 +130,7 @@ int main(int argc, char* argv[])
   for(int i = 0; i < INIT_REF_NUM; i++) basemesh.refine_all_elements();
   mesh.copy(&basemesh);
 
-  // Enter boundary markers.
+  // Initialize boundary conditions.
   BCTypes bc_types;
   bc_types.add_bc_dirichlet(BDY_DIRICHLET);
 
@@ -158,9 +160,12 @@ int main(int argc, char* argv[])
   // Visualize initial condition.
   char title[100];
   ScalarView sln_view("Initial condition", new WinGeom(0, 0, 440, 350));
+  sln_view.show_mesh(false);
   OrderView ordview("Initial mesh", new WinGeom(445, 0, 440, 350));
-  ScalarView time_error_view("Temporal error", new WinGeom(0, 405, 440, 350));
-  ScalarView space_error_view("Spatial error", new WinGeom(445, 405, 440, 350));
+  ScalarView time_error_view("Temporal error", new WinGeom(0, 400, 440, 350));
+  time_error_view.fix_scale_width(60);
+  ScalarView space_error_view("Spatial error", new WinGeom(445, 400, 440, 350));
+  space_error_view.fix_scale_width(60);
   sln_view.show(sln_prev_time);
   ordview.show(&space);
 
@@ -169,7 +174,7 @@ int main(int argc, char* argv[])
   if (ADAPTIVE_TIME_STEP_ON) info("Time step history will be saved to file time_step_history.dat.");
   
   // Time stepping loop.
-  double current_time = time_step; int ts = 1;
+  double current_time = 0; int ts = 1;
   do 
   {
     info("Begin time step %d.", ts);
@@ -177,9 +182,20 @@ int main(int argc, char* argv[])
     if (ts > 1 && ts % UNREF_FREQ == 0) 
     {
       info("Global mesh derefinement.");
-      if (UNREF_LEVEL == 1) mesh.unrefine_all_elements();
-      else mesh.copy(&basemesh);
-      space.set_uniform_order(P_INIT);
+      switch (UNREF_METHOD) {
+        case 1: mesh.copy(&basemesh);
+                space.set_uniform_order(P_INIT);
+                break;
+        case 2: mesh.unrefine_all_elements();
+                space.set_uniform_order(P_INIT);
+                break;
+        case 3: mesh.unrefine_all_elements();
+                //space.adjust_element_order(-1, P_INIT);
+                space.adjust_element_order(-1, -1, P_INIT, P_INIT);
+                break;
+        default: error("Wrong global derefinement method.");
+      }
+
       ndof = Space::get_num_dofs(&space);
     }
 
@@ -193,7 +209,7 @@ int main(int argc, char* argv[])
     double err_est;
     do {
       // Construct globally refined reference mesh and setup reference space.
-      Space* ref_space = construct_refined_space(&space);
+      Space* ref_space = Space::construct_refined_space(&space);
 
       // Initialize discrete problem on reference mesh.
       DiscreteProblem* ref_dp = new DiscreteProblem(&wf, ref_space);
@@ -203,7 +219,7 @@ int main(int argc, char* argv[])
          current_time, time_step, bt->get_size());
       bool verbose = true;
       bool is_linear = false;
-      if (!rk_time_step(current_time, time_step, bt, sln_prev_time, &ref_sln, time_error_fn,
+      if (!RungeKutta::rk_time_step(current_time, time_step, bt, sln_prev_time, &ref_sln, time_error_fn,
                         ref_dp, matrix_solver, verbose, is_linear, NEWTON_TOL_FINE, NEWTON_MAX_ITER)) {
         error("Runge-Kutta time step failed, try to decrease time step size.");
       }
@@ -211,7 +227,7 @@ int main(int argc, char* argv[])
       /* If ADAPTIVE_TIME_STEP_ON == true, estimate temporal error. 
          If too large or too small, then adjust it and restart the time step. */
 
-      double rel_err_time;
+      double rel_err_time = 0;
       if (bt->is_embedded() == true) {
         info("Calculating temporal error estimate.");
 
@@ -222,7 +238,8 @@ int main(int argc, char* argv[])
         time_error_view.show_mesh(false);
         time_error_view.show(time_error_fn);
 
-        rel_err_time = calc_norm(time_error_fn, HERMES_H1_NORM) / calc_norm(&ref_sln, HERMES_H1_NORM) * 100;
+        rel_err_time = hermes2d.calc_norm(time_error_fn, HERMES_H1_NORM) / 
+                       hermes2d.calc_norm(&ref_sln, HERMES_H1_NORM) * 100;
         if (ADAPTIVE_TIME_STEP_ON == false) info("rel_err_time: %g%%", rel_err_time);
       }
 

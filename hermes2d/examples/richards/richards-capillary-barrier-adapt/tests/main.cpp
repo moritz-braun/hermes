@@ -7,9 +7,16 @@ using namespace RefinementSelectors;
 // This test makes sure that the example "richards-capillary-barrier-adapt" works correctly.
 
 // Constitutive relations.
-#define CONSTITUTIVE_GENUCHTEN                    // Van Genuchten or Gardner.
+enum CONSTITUTIVE_RELATIONS {
+    CONSTITUTIVE_GENUCHTEN, // Van Genuchten.
+    CONSTITUTIVE_GARDNER // Gardner.
+};
 
-const char* mesh_file = "domain-half.mesh";
+CONSTITUTIVE_RELATIONS constitutive_relations = CONSTITUTIVE_GENUCHTEN;
+
+// Choose full domain or half domain.
+// const char* mesh_file = "domain-full.mesh";
+std::string mesh_file = "domain-half.mesh";
 
 // Methods.
 const int ITERATIVE_METHOD = 2;		          // 1 = Newton, 2 = Picard.
@@ -29,10 +36,9 @@ const int INIT_REF_NUM_BDY_TOP = 0;               // Number of initial mesh refi
 
 // Adaptivity.
 const int UNREF_FREQ = 1;                         // Every UNREF_FREQth time step the mesh is unrefined.
-const int UNREF_LEVEL = 1;                        // 1 = one layer of refinements is shaved off and poly degrees
-                                                  // of all elements reset to P_INIT; 2 = mesh reset to basemesh.  
-                                                  // TODO: Add a third option where one layer will be taken off 
-                                                  // and just one polynomial degree subtracted.
+const int UNREF_METHOD = 3;                       // 1... mesh reset to basemesh and poly degrees to P_INIT.   
+                                                  // 2... one ref. layer shaved off, poly degrees reset to P_INIT.
+                                                  // 3... one ref. layer shaved off, poly degrees decreased by one. 
 const double THRESHOLD = 0.3;                     // This is a quantitative parameter of the adapt(...) function and
                                                   // it has different meanings for various adaptive strategies (see below).
 const int STRATEGY = 1;                           // Adaptive strategy:
@@ -78,18 +84,17 @@ const double PULSE_END_TIME = 1000.0;             // Time interval of the top la
 double current_time = time_step;                  // Global time variable initialized with first time step.
 
 
-
 // Problem parameters.
 double H_INIT = -15.0;                            // Initial pressure head.
 double H_ELEVATION = 10.0;                        // Top constant pressure head -- an infiltration experiment.
-const double K_S_vals[4] = {350.2, 712.8, 1.68, 18.64}; 
-const double ALPHA_vals[4] = {0.01, 1.0, 0.01, 0.01};
-const double N_vals[4] = {2.5, 2.0, 1.23, 2.5};
-const double M_vals[4] = {0.864, 0.626, 0.187, 0.864};
+double K_S_vals[4] = {350.2, 712.8, 1.68, 18.64}; 
+double ALPHA_vals[4] = {0.01, 1.0, 0.01, 0.01};
+double N_vals[4] = {2.5, 2.0, 1.23, 2.5};
+double M_vals[4] = {0.864, 0.626, 0.187, 0.864};
 
-const double THETA_R_vals[4] = {0.064, 0.0, 0.089, 0.064};
-const double THETA_S_vals[4] = {0.14, 0.43, 0.43, 0.24};
-const double STORATIVITY_vals[4] = {0.1, 0.1, 0.1, 0.1};
+double THETA_R_vals[4] = {0.064, 0.0, 0.089, 0.064};
+double THETA_S_vals[4] = {0.14, 0.43, 0.43, 0.24};
+double STORATIVITY_vals[4] = {0.1, 0.1, 0.1, 0.1};
 
 
 // Precalculation of constitutive tables.
@@ -103,10 +108,6 @@ const int CONSTITUTIVE_TABLE_METHOD = 2;          // 0 - constitutive functions 
 const int NUM_OF_INTERVALS = 16;                  // Number of intervals.                      
 const double INTERVALS_4_APPROX[16] = {-1.0, -2.0, -3.0, -4.0, -5.0, -8.0, -10.0, -12.0, // Low limits of intervals approximated by quintic splines.
 				     -15.0, -20.0, -30.0, -50.0, -75.0, -100.0,-300.0, -1000.0}; 
-int* POL_SEARCH_HELP;                             // This array contains for each integer of h function appropriate polynomial ID.
-double**** K_POLS;                                // First DIM is the interval ID, second DIM is the material ID, third DIM is 
-                                                  // the derivative degree, fourth DIM are the coefficients.
-double**** C_POLS;
 //!------------------------------------------!//
 
 
@@ -114,19 +115,6 @@ double**** C_POLS;
 double TABLE_LIMIT = -1000.0; 		          // Limit of precalculated functions (should be always negative value lower 
 						  // then the lowest expect value of the solution (consider DMP!!)
 const double TABLE_PRECISION = 0.1;               // Precision of precalculated table use 1.0, 0,1, 0.01, etc.....
-double** K_TABLE;                                  
-double** dKdh_TABLE;
-double** ddKdhh_TABLE;
-double** C_TABLE;
-double** dCdh_TABLE;
-bool CONSTITUTIVE_TABLES_READY = false;
-double*** POLYNOMIALS;                            // Polynomial approximation of the K(h) function close to saturation.
-                                                  // This function has singularity in its second derivative.
-						  // First dimension is material ID
-						  // Second dimension is the polynomial derivative.
-						  // Third dimension are the polynomial's coefficients.
-						  
-						  
 const double LOW_LIMIT=-1.0;                      // Lower bound of K(h) function approximated by polynomials.
 const int NUM_OF_INSIDE_PTS = 0;
 //!------------------------------------------!//
@@ -135,22 +123,11 @@ const int NUM_OF_INSIDE_PTS = 0;
 bool POLYNOMIALS_READY = false;
 bool POLYNOMIALS_ALLOCATED = false;
 
-
-// Global variables for forms.
-double K_S, ALPHA, THETA_R, THETA_S, N, M, STORATIVITY;
-
-// Choose here which constitutive relations should be used.
-#ifdef CONSTITUTIVE_GENUCHTEN
-#include "constitutive_genuchten.cpp"
-#else
-#include "constitutive_gardner.cpp"
-#endif
-
 // Boundary markers.
-const int BDY_TOP = 1;
-const int BDY_RIGHT = 2;
-const int BDY_BOTTOM = 3;
-const int BDY_LEFT = 4;
+const std::string BDY_TOP = "1";
+const std::string BDY_RIGHT = "2";
+const std::string BDY_BOTTOM = "3";
+const std::string BDY_LEFT = "4";
 
 // Initial condition.
 double init_cond(double x, double y, double& dx, double& dy) {
@@ -159,33 +136,25 @@ double init_cond(double x, double y, double& dx, double& dy) {
   return H_INIT;
 }
 
-// Essential (Dirichlet) boundary condition values.
-scalar essential_bc_values(double x, double y, double time)
-{
-  if (time < STARTUP_TIME)
-    return H_INIT + time/STARTUP_TIME*(H_ELEVATION-H_INIT);
-  else if (time > PULSE_END_TIME)
-    return H_INIT;
-  else
-    return H_ELEVATION;
-}
+// Constitutive relations.
+#include "../constitutive_relations.cpp"
 
 // Weak forms.
-#include "forms.cpp"
-
-// Additional functionality.
-#include "extras.cpp"
+#include "../definitions.cpp"
 
 // Main function.
 int main(int argc, char* argv[])
 {
+  // Instantiate a class with global functions.
+  Hermes2D hermes2d;
+
+  ConstitutiveRelations* relations;
+  if(constitutive_relations == CONSTITUTIVE_GENUCHTEN)
+    relations = new ConstitutiveGenuchten(LOW_LIMIT, POLYNOMIALS_READY, CONSTITUTIVE_TABLE_METHOD, NUM_OF_INSIDE_PTS, TABLE_LIMIT, ALPHA_vals, N_vals, M_vals, K_S_vals, THETA_R_vals,
+    THETA_S_vals, STORATIVITY_vals, TABLE_PRECISION, MATERIAL_COUNT, POLYNOMIALS_ALLOCATED, NUM_OF_INTERVALS, ITERATIVE_METHOD);
+  else
+    relations = new ConstitutiveGardner(K_S_vals[0], ALPHA_vals[0], THETA_S_vals[0], THETA_R_vals[0], CONSTITUTIVE_TABLE_METHOD);
   
-  // Either use exact constitutive relations (slow) (method 0) or precalculate 
-  // their linear approximations (faster) (method 1) or
-  // precalculate their quintic polynomial approximations (method 2) -- managed by 
-  // the following loop "Initializing polynomial approximation".
-  if (CONSTITUTIVE_TABLE_METHOD == 1)
-    CONSTITUTIVE_TABLES_READY = get_constitutive_tables(ITERATIVE_METHOD);
   // Points to be used for polynomial approximation of K(h).
   double* points = new double[NUM_OF_INSIDE_PTS];
 
@@ -193,14 +162,13 @@ int main(int argc, char* argv[])
   // to zero in case of CONSTITUTIVE_TABLE_METHOD==1.
   // In case of CONSTITUTIVE_TABLE_METHOD==2, all constitutive functions are approximated by polynomials.
   info("Initializing polynomial approximations.");
-  for (int i=0; i < MATERIAL_COUNT; i++) {
-    init_polynomials(6 + NUM_OF_INSIDE_PTS, LOW_LIMIT, points, NUM_OF_INSIDE_PTS, i);
-  }
-  POLYNOMIALS_READY = true;
+  for (int i=0; i < MATERIAL_COUNT; i++)
+    relations->init_polynomials(6 + NUM_OF_INSIDE_PTS, LOW_LIMIT, points, NUM_OF_INSIDE_PTS, i);
+  relations->polynomials_ready = true;
   if (CONSTITUTIVE_TABLE_METHOD == 2) {
-    CONSTITUTIVE_TABLES_READY = true ;
+    relations->constitutive_tables_ready = true ;
     //Assign table limit to global definition.
-    TABLE_LIMIT = INTERVALS_4_APPROX[NUM_OF_INTERVALS-1];
+     relations->table_limit = INTERVALS_4_APPROX[NUM_OF_INTERVALS-1];
   }
   
   // Time measurement.
@@ -210,24 +178,20 @@ int main(int argc, char* argv[])
   // Load the mesh.
   Mesh mesh, basemesh;
   H2DReader mloader;
-  mloader.load(mesh_file, &basemesh);
+  mloader.load(mesh_file.c_str(), &basemesh);
   
   // Perform initial mesh refinements.
   mesh.copy(&basemesh);
   for(int i = 0; i < INIT_REF_NUM; i++) mesh.refine_all_elements();
   mesh.refine_towards_boundary(BDY_TOP, INIT_REF_NUM_BDY_TOP);
 
-  // Enter boundary markers.
-  BCTypes bc_types;
-  bc_types.add_bc_dirichlet(BDY_TOP);
-  bc_types.add_bc_neumann(Hermes::vector<int>(BDY_RIGHT, BDY_BOTTOM, BDY_LEFT));
+  // Initialize boundary conditions.
+  RichardsEssentialBC bc_essential(BDY_TOP, H_ELEVATION, PULSE_END_TIME, H_INIT, STARTUP_TIME);
+  EssentialBCs bcs(&bc_essential);
 
-  // Enter Dirichlet boundary values.
-  BCValues bc_values(&current_time);
-  bc_values.add_timedep_function(BDY_TOP, essential_bc_values);
 
   // Create an H1 space with default shapeset.
-  H1Space space(&mesh, &bc_types, &bc_values, P_INIT);
+  H1Space space(&mesh, &bcs, P_INIT);
   int ndof = Space::get_num_dofs(&space);
   info("ndof = %d.", ndof);
 
@@ -235,45 +199,30 @@ int main(int argc, char* argv[])
   H1ProjBasedSelector selector(CAND_LIST, CONV_EXP, H2DRS_DEFAULT_ORDER);
 
   // Solutions for the time stepping and the Newton's method.
-  Solution sln, ref_sln, sln_prev_time, sln_prev_iter;
-  
-  // Assign the function f() to the fine mesh.
-  sln_prev_time.set_exact(&mesh, init_cond);
-  sln_prev_iter.set_exact(&mesh, init_cond);
+  Solution sln, ref_sln;
+  InitialSolutionRichards sln_prev_time(&mesh, H_INIT);
+  InitialSolutionRichards sln_prev_iter(&mesh, H_INIT);
 
   // Initialize the weak formulation.
-  WeakForm wf;
+  WeakForm* wf;
   if (ITERATIVE_METHOD == 1) {
     if (TIME_INTEGRATION == 1) {
-      info("Registering forms for the Newton's method (implicit Euler in time).");
-      wf.add_matrix_form(jac_form_vol_euler, jac_form_vol_ord, HERMES_NONSYM, HERMES_ANY, 
-	                 &sln_prev_time);
-      wf.add_vector_form(res_form_vol_euler, res_form_vol_ord, HERMES_ANY, 
-			 &sln_prev_time);
+      info("Creating weak formulation for the Newton's method (implicit Euler in time).");
+      wf = new WeakFormRichardsNewtonEuler(relations, time_step, &sln_prev_time);
     }
     else {
-      info("Registering forms for the Newton's method (Crank-Nicolson in time).");
-      wf.add_matrix_form(jac_form_vol_cranic, jac_form_vol_ord, HERMES_NONSYM, HERMES_ANY, 
-      		         &sln_prev_time);
-      wf.add_vector_form(res_form_vol_cranic, res_form_vol_ord, HERMES_ANY, 
-			 &sln_prev_time);
+      info("Creating weak formulation for the Newton's method (Crank-Nicolson in time).");
+      wf = new WeakFormRichardsNewtonCrankNicolson(relations, time_step, &sln_prev_time);
     }
   }
   else {
     if (TIME_INTEGRATION == 1) {
-      info("Registering forms for the Picard's method (implicit Euler in time).");
-      wf.add_matrix_form(bilinear_form_picard_euler, bilinear_form_picard_euler_ord, HERMES_NONSYM, HERMES_ANY, 
-	                 &sln_prev_iter);
-      wf.add_vector_form(linear_form_picard_euler, linear_form_picard_euler_ord, HERMES_ANY, 
-			 Hermes::vector<MeshFunction*>(&sln_prev_iter, &sln_prev_time));
+      info("Creating weak formulation for the Picard's method (implicit Euler in time).");
+      wf = new WeakFormRichardsPicardEuler(relations, time_step, &sln_prev_iter, &sln_prev_time);
     }
     else {
-      info("Registering forms for the Picard's method (Crank-Nicolson in time).");
+      info("Creating weak formulation for the Picard's method (Crank-Nicolson in time).");
       error("Not implemented yet.");
-      wf.add_matrix_form(bilinear_form_picard_euler, bilinear_form_picard_euler_ord, HERMES_NONSYM, HERMES_ANY, 
-	                 &sln_prev_iter);
-      wf.add_vector_form(linear_form_picard_euler, linear_form_picard_euler_ord, HERMES_ANY, 
-			 Hermes::vector<MeshFunction*>(&sln_prev_iter, &sln_prev_time));
     }
   }
 
@@ -294,9 +243,20 @@ int main(int argc, char* argv[])
     if (ts > 1 && ts % UNREF_FREQ == 0) 
     {
       info("Global mesh derefinement.");
-      if (UNREF_LEVEL == 1) mesh.unrefine_all_elements();
-      else mesh.copy(&basemesh);
-      space.set_uniform_order(P_INIT);
+      switch (UNREF_METHOD) {
+        case 1: mesh.copy(&basemesh);
+                space.set_uniform_order(P_INIT);
+                break;
+        case 2: mesh.unrefine_all_elements();
+                space.set_uniform_order(P_INIT);
+                break;
+        case 3: mesh.unrefine_all_elements();
+                //space.adjust_element_order(-1, P_INIT);
+                space.adjust_element_order(-1, -1, P_INIT, P_INIT);
+                break;
+        default: error("Wrong global derefinement method.");
+      }
+
       ndof = Space::get_num_dofs(&space);
     }
 
@@ -310,7 +270,7 @@ int main(int argc, char* argv[])
 
       // Construct globally refined reference mesh
       // and setup reference space.
-      Space* ref_space = construct_refined_space(&space);
+      Space* ref_space = Space::construct_refined_space(&space);
       ndof = Space::get_num_dofs(ref_space);
 
       // Next we need to calculate the reference solution.
@@ -331,7 +291,7 @@ int main(int argc, char* argv[])
 
         // Initialize the FE problem.
         bool is_linear = false;
-        DiscreteProblem dp(&wf, ref_space, is_linear);
+        DiscreteProblem dp(wf, ref_space, is_linear);
 
         // Set up the solver, matrix, and rhs according to the solver selection.
         SparseMatrix* matrix = create_matrix(matrix_solver);
@@ -347,7 +307,10 @@ int main(int argc, char* argv[])
         // Save coefficient vector.
         for (int i=0; i < ndof; i++) save_coeff_vec[i] = coeff_vec[i];
         double damping_coeff = 1.0;
-        while (!solve_newton(coeff_vec, &dp, solver, matrix, rhs, 
+
+        bc_essential.set_current_time(current_time);
+
+        while (!hermes2d.solve_newton(coeff_vec, &dp, solver, matrix, rhs, 
                              NEWTON_TOL, NEWTON_MAX_ITER, verbose, damping_coeff)) {
           // Restore solution from the beginning of time step.
           for (int i=0; i < ndof; i++) coeff_vec[i] = save_coeff_vec[i];
@@ -386,8 +349,11 @@ int main(int argc, char* argv[])
         // reduce time step to make it converge, but then restore time step 
         // size to its original value.
         info("Performing Picard's iteration (tau = %g days):", time_step);
-        bool success, verbose = true;
-        while(!solve_picard(&wf, ref_space, &sln_prev_iter, matrix_solver, PICARD_TOL, 
+        bool verbose = true;
+
+        bc_essential.set_current_time(current_time);
+
+        while(!hermes2d.solve_picard(wf, ref_space, &sln_prev_iter, matrix_solver, PICARD_TOL, 
                             PICARD_MAX_ITER, verbose)) {
           // Restore solution from the beginning of time step.
           sln_prev_iter.copy(&sln_prev_time);

@@ -22,11 +22,11 @@
 
 
 #include "h3d_common.h"
+#include "space/space.h"
 #include "discrete_problem.h"
 #include "traverse.h"
 #include "../../hermes_common/error.h"
 #include "../../hermes_common/callstack.h"
-
 
 
 DiscreteProblem::FnCache::~FnCache()
@@ -85,10 +85,37 @@ DiscreteProblem::DiscreteProblem(WeakForm *wf, Hermes::vector<Space *> spaces, b
   have_spaces = true;
 
   // H2D is initializing precalc shapesets here.
-
   // Create global enumeration of dof and fill the ndof variable
   this->ndof = Space::assign_dofs(this->spaces);
 }
+
+DiscreteProblem::DiscreteProblem(WeakForm *wf, Space* space, bool is_linear)
+{
+  _F_
+  this->wf = wf;
+  this->spaces.push_back(space);
+  this->is_linear = is_linear;
+
+  sp_seq = new int[wf->neq];
+  memset(sp_seq, -1, sizeof(int) * wf->neq);
+  wf_seq = -1;
+
+  matrix_buffer = NULL;
+  matrix_buffer_dim = 0;
+
+  values_changed = true;
+  struct_changed = true;
+
+  have_matrix = false;
+
+  this->spaces = Hermes::vector<Space *>();
+  for (int i = 0; i < wf->neq; i++) this->spaces.push_back(space);
+  have_spaces = true;
+
+  // Create global enumeration of dof and fill the ndof variable
+  this->ndof = space->get_num_dofs();
+}
+
 
 DiscreteProblem::~DiscreteProblem()
 {
@@ -154,8 +181,10 @@ bool DiscreteProblem::is_up_to_date()
 
 //// matrix creation ///////////////////////////////////////////////////////////////////////////////
 
-// This functions is identical in H2D and H3D.
-void DiscreteProblem::create_sparse_structure(SparseMatrix *mat, Vector* rhs, bool rhsonly)
+// Signature of this function is identical in H1D, H2D, H3D, but only first three parameters are 
+// used in H3D.
+void DiscreteProblem::create_sparse_structure(SparseMatrix *mat, Vector* rhs, bool rhsonly, 
+                                              bool force_diagonal_blocks, Table* block_weights)
 {
   _F_
 
@@ -253,7 +282,8 @@ void DiscreteProblem::assemble(SparseMatrix* mat, Vector* rhs, bool rhsonly)
   assemble(NULL, mat, rhs, rhsonly);
 }
 
-void DiscreteProblem::assemble(scalar* coeff_vec, SparseMatrix* mat, Vector* rhs, bool rhsonly)
+void DiscreteProblem::assemble(scalar* coeff_vec, SparseMatrix* mat, Vector* rhs, bool rhsonly,
+                               bool force_diagonal_blocks, bool add_dir_lift, Table* block_weights)
 {
   /* BEGIN IDENTICAL CODE WITH H2D */
 
@@ -261,7 +291,7 @@ void DiscreteProblem::assemble(scalar* coeff_vec, SparseMatrix* mat, Vector* rhs
   // Sanity checks.
   if (coeff_vec == NULL && this->is_linear == false) error("coeff_vec is NULL in FeProblem::assemble().");
   if (!have_spaces) error("You have to call FeProblem::set_spaces() before calling assemble().");
-  for (int i=0; i<this->wf->neq; i++)
+  for (int i = 0; i < this->wf->neq; i++)
   {
     if (this->spaces[i] == NULL) error("A space is NULL in assemble().");
   }
@@ -371,7 +401,7 @@ void DiscreteProblem::assemble(scalar* coeff_vec, SparseMatrix* mat, Vector* rhs
         {
           WeakForm::MatrixFormVol *mfv = s->mfvol[ww];
           if (isempty[mfv->i] || isempty[mfv->j]) continue;
-          if (mfv->area != HERMES_ANY && !wf->is_in_area(marker, mfv->area)) continue;
+          if (mfv->area != HERMES_ANY_INT && !wf->is_in_area(marker, mfv->area)) continue;
           int m = mfv->i; fv = test_fn + m; am = al + m;
           int n = mfv->j; fu = base_fn + n; an = al + n;
           bool tra = (m != n) && (mfv->sym != HERMES_NONSYM);
@@ -478,7 +508,7 @@ void DiscreteProblem::assemble(scalar* coeff_vec, SparseMatrix* mat, Vector* rhs
         {
           WeakForm::VectorFormVol* vfv = s->vfvol[ww];
           if (isempty[vfv->i]) continue;
-          if (vfv->area != HERMES_ANY && !wf->is_in_area(marker, vfv->area)) continue;
+          if (vfv->area != HERMES_ANY_INT && !wf->is_in_area(marker, vfv->area)) continue;
           int m = vfv->i;  
           fv = test_fn + m;      // H2D uses fv = spss[m]
           am = al + m;
@@ -518,7 +548,7 @@ void DiscreteProblem::assemble(scalar* coeff_vec, SparseMatrix* mat, Vector* rhs
           {
             WeakForm::MatrixFormSurf* mfs = s->mfsurf[ww];
             if (isempty[mfs->i] || isempty[mfs->j]) continue;
-            if (mfs->area != HERMES_ANY && !wf->is_in_area(marker, mfs->area)) continue;
+            if (mfs->area != HERMES_ANY_INT && !wf->is_in_area(marker, mfs->area)) continue;
             int m = mfs->i; 
             int n = mfs->j; 
             fu = base_fn + n;    // This is different in H2D.
@@ -569,7 +599,7 @@ void DiscreteProblem::assemble(scalar* coeff_vec, SparseMatrix* mat, Vector* rhs
           {
             WeakForm::VectorFormSurf* vfs = s->vfsurf[ww];
             if (isempty[vfs->i]) continue;
-            if (vfs->area != HERMES_ANY && !wf->is_in_area(marker, vfs->area)) continue;
+            if (vfs->area != HERMES_ANY_INT && !wf->is_in_area(marker, vfs->area)) continue;
             int m = vfs->i; 
             fv = test_fn + m;      // This is different from H2D.  
             am = al + m;
@@ -1108,33 +1138,6 @@ scalar DiscreteProblem::eval_form(WeakForm::VectorFormSurf *vfs, Hermes::vector<
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-Hermes::vector<Space *> * construct_refined_spaces(Hermes::vector<Space *> coarse, int order_increase)
-{
-  _F_
-  Hermes::vector<Space *> * ref_spaces = new Hermes::vector<Space *>;
-  for (unsigned int i = 0; i < coarse.size(); i++) 
-  {
-    Mesh* ref_mesh = new Mesh;
-    ref_mesh->copy(*coarse[i]->get_mesh());
-    ref_mesh->refine_all_elements(H3D_H3D_H3D_REFT_HEX_XYZ);
-    ref_spaces->push_back(coarse[i]->dup(ref_mesh));
-    (*ref_spaces)[i]->copy_orders(*coarse[i], order_increase);
-  }
-  return ref_spaces;
-}
-
-// Light version for a single space.
-Space* construct_refined_space(Space* coarse, int order_increase)
-{
-  _F_
-  Mesh* ref_mesh = new Mesh;
-  ref_mesh->copy(*coarse->get_mesh());
-  ref_mesh->refine_all_elements(H3D_H3D_H3D_REFT_HEX_XYZ);
-  Space* ref_space = coarse->dup(ref_mesh);
-  ref_space->copy_orders(*coarse, order_increase);
-  return ref_space;
-}
-
 // Perform Newton's iteration.
 bool HERMES_RESIDUAL_AS_VECTOR = false;
 bool solve_newton(scalar* coeff_vec, DiscreteProblem* dp, Solver* solver, SparseMatrix* matrix,
@@ -1143,7 +1146,7 @@ bool solve_newton(scalar* coeff_vec, DiscreteProblem* dp, Solver* solver, Sparse
 {
   info("Solve newton");
   // Prepare solutions for measuring residual norm.
-  int num_spaces = dp->get_num_spaces();
+  int num_spaces = dp->get_spaces().size();
 
   Hermes::vector<Solution*> solutions;
   Hermes::vector<double> dir_lift_false;

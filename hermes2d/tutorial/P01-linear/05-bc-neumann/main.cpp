@@ -21,7 +21,7 @@ MatrixSolverType matrix_solver = SOLVER_UMFPACK;  // Possibilities: SOLVER_AMESO
                                                   // SOLVER_PETSC, SOLVER_SUPERLU, SOLVER_UMFPACK.
 
 // Boundary markers.
-const int BDY_BOTTOM = 1, BDY_OUTER = 2, BDY_LEFT = 3, BDY_INNER = 4;
+const std::string BDY_BOTTOM = "1", BDY_OUTER = "2", BDY_LEFT = "3", BDY_INNER = "4";
 
 // Problem parameters.
 const double CONST_F = -1.0;                      // Right-hand side.
@@ -30,7 +30,7 @@ const double CONST_GAMMA_OUTER = 1.0;             // Outer normal derivative on 
 const double CONST_GAMMA_LEFT = -0.5;             // Outer normal derivative on Gamma_3.
 
 // Weak forms.
-#include "forms.cpp"
+#include "definitions.cpp"
 
 int main(int argc, char* argv[])
 {
@@ -42,27 +42,18 @@ int main(int argc, char* argv[])
   // Perform initial mesh refinements.
   mesh.refine_towards_vertex(3, CORNER_REF_LEVEL);
 
-  // Enter boundary markers.
-  BCTypes bc_types;
-  bc_types.add_bc_dirichlet(BDY_INNER);
-  bc_types.add_bc_neumann(Hermes::vector<int>(BDY_BOTTOM, BDY_OUTER, BDY_LEFT));
-
-  // Enter Dirichlet boudnary values.
-  BCValues bc_values;
-  bc_values.add_zero(BDY_INNER);
+  // Initialize boundary conditions
+  DefaultEssentialBCConst bc_essential(BDY_INNER, 0.0);
+  EssentialBCs bcs(&bc_essential);
 
   // Create an H1 space with default shapeset.
-  H1Space space(&mesh, &bc_types, &bc_values, P_INIT);
+  H1Space space(&mesh, &bcs, P_INIT);
   int ndof = Space::get_num_dofs(&space);
   info("ndof = %d", ndof);
 
   // Initialize the weak formulation.
-  WeakForm wf;
-  wf.add_matrix_form(callback(bilinear_form));
-  wf.add_vector_form(callback(linear_form));
-  wf.add_vector_form_surf(callback(linear_form_surf_bottom), BDY_BOTTOM);
-  wf.add_vector_form_surf(callback(linear_form_surf_outer), BDY_OUTER);
-  wf.add_vector_form_surf(callback(linear_form_surf_left), BDY_LEFT);
+  CustomWeakFormPoissonNeumann wf(CONST_F, BDY_BOTTOM, CONST_GAMMA_BOTTOM, 
+                                  BDY_OUTER, CONST_GAMMA_OUTER, BDY_INNER, CONST_GAMMA_LEFT);
 
   // Initialize the FE problem.
   bool is_linear = true;

@@ -58,19 +58,19 @@ const int WATER_2 = 2;
 const int IRON = 3;
 
 // Weak forms.
-#include "forms.cpp"
+#include "../forms.cpp"
 
 int main(int argc, char* argv[])
 {
   // Load the mesh.
   Mesh mesh;
   ExodusIIReader mloader;
-  if (!mloader.load("iron-water.e", &mesh)) error("ExodusII mesh load failed.");
+  if (!mloader.load("../iron-water.e", &mesh)) error("ExodusII mesh load failed.");
 
   // Perform initial uniform mesh refinement.
   for (int i=0; i < INIT_REF_NUM; i++) mesh.refine_all_elements();
 
-  // Enter boundary markers.
+  // Initialize boundary conditions.
   BCTypes bc_types;
   bc_types.add_bc_dirichlet(Hermes::vector<int>(WATER_2, IRON));
   bc_types.add_bc_neumann(WATER_1); 
@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
     info("---- Adaptivity step %d:", as);
 
     // Construct globally refined reference mesh and setup reference space.
-    Space* ref_space = construct_refined_space(&space);
+    Space* ref_space = Space::construct_refined_space(&space);
 
     // Assemble the reference problem.
     info("Solving on reference mesh.");

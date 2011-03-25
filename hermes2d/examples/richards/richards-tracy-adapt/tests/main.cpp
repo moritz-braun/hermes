@@ -109,7 +109,7 @@ scalar essential_bc_values(double x, double y)
 }
 
 // Weak forms.
-#include "forms.cpp"
+#include "../forms.cpp"
 
 int main(int argc, char* argv[])
 {
@@ -120,7 +120,7 @@ int main(int argc, char* argv[])
   // Load the mesh.
   Mesh mesh, basemesh;
   H2DReader mloader;
-  mloader.load("square.mesh", &basemesh);
+  mloader.load("../square.mesh", &basemesh);
 
   // Perform initial mesh refinements.
   mesh.copy(&basemesh);
@@ -128,7 +128,7 @@ int main(int argc, char* argv[])
   mesh.refine_towards_boundary(BDY_TOP, INIT_REF_NUM_BDY);
   basemesh.copy(&mesh);
   
-  // Enter boundary markers.
+  // Initialize boundary conditions.
   BCTypes bc_types;
   bc_types.add_bc_dirichlet(Hermes::vector<int>(BDY_TOP, BDY_REST));
 
@@ -224,7 +224,7 @@ int main(int argc, char* argv[])
 
       // Construct globally refined reference mesh
       // and setup reference space.
-      Space* ref_space = construct_refined_space(&space);
+      Space* ref_space = Space::construct_refined_space(&space);
 
       scalar* coeff_vec = new scalar[Space::get_num_dofs(ref_space)];
      

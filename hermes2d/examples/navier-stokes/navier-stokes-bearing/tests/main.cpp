@@ -3,7 +3,6 @@
 #define HERMES_REPORT_VERBOSE
 #define HERMES_REPORT_FILE "application.log"
 #include "hermes2d.h"
-#include "weakform/forms.h"
 
 // This test makes sure that example "ns-bearing" works correctly.
 
@@ -68,7 +67,7 @@ scalar essential_bc_values_yvel(double x, double y, double time) {
   }
 
 // Weak forms.
-#include "forms.cpp"
+#include "../forms.cpp"
 
 // Custom function to calculate drag coefficient.
 double integrate_over_wall(MeshFunction* meshfn, int marker)
@@ -108,8 +107,8 @@ int main(int argc, char* argv[])
   // Load the mesh.
   Mesh mesh;
   H2DReader mloader;
-  mloader.load("domain-excentric.mesh", &mesh);
-  //mloader.load("domain-concentric.mesh", &mesh);
+  mloader.load("../domain-excentric.mesh", &mesh);
+  //mloader.load("../domain-concentric.mesh", &mesh);
 
   // Initial mesh refinements.
   for (int i=0; i < INIT_REF_NUM; i++) mesh.refine_all_elements();

@@ -46,18 +46,12 @@ int main(int argc, char* argv[])
   // Refine all elements (optional).
   mesh.refine_all_elements();
 
-  // Enter boundary markers.
-  // (If no markers are entered, default is a natural BC).
-  BCTypes bc_types;
-
-  // Enter Dirichlet boundary values (default is zero).
-  BCValues bc_values;
-
   // Create an H1 space with default shapeset and natural BC.
-  H1Space space(&mesh, &bc_types, &bc_values, P_INIT);
+  H1Space space(&mesh, P_INIT);
 
   // View FE basis functions.
   BaseView bview("FE Space", new WinGeom(0, 0, 440, 350));
+  bview.fix_scale_width(50);
   bview.show(&space);
 
   // Practice some keyboard and mouse controls.

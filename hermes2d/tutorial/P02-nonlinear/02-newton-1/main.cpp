@@ -29,36 +29,17 @@ const double INIT_COND_CONST = 3.0;               // Constant initial condition.
 MatrixSolverType matrix_solver = SOLVER_UMFPACK;  // Possibilities: SOLVER_AMESOS, SOLVER_AZTECOO, SOLVER_MUMPS,
                                                   // SOLVER_PETSC, SOLVER_SUPERLU, SOLVER_UMFPACK.
 
-// Thermal conductivity (temperature-dependent)
-// Note: for any u, this function has to be positive.
-template<typename Real>
-Real lam(Real u) 
-{ 
-  return 1 + pow(u, 4); 
-}
-
-// Derivative of the thermal conductivity with respect to 'u'.
-template<typename Real>
-Real dlam_du(Real u) 
-{ 
-  return 4*pow(u, 3); 
-}
-
-// Heat sources (can be a general function of 'x' and 'y').
-template<typename Real>
-Real rhs(Real x, Real y)
-{
-  return 1.0;
-}
-
 // Boundary markers.
-const int BDY_DIRICHLET = 1;
+const std::string BDY_DIRICHLET = "1";
 
 // Weak forms.
 #include "forms.cpp"
 
 int main(int argc, char* argv[])
 {
+  // Instantiate a class with global functions.
+  Hermes2D hermes2d;
+
   // Load the mesh.
   Mesh mesh;
   H2DReader mloader;
@@ -66,24 +47,18 @@ int main(int argc, char* argv[])
 
   // Perform initial mesh refinements.
   for(int i = 0; i < INIT_GLOB_REF_NUM; i++) mesh.refine_all_elements();
-  mesh.refine_towards_boundary(1,INIT_BDY_REF_NUM);
-
-  // Enter boundary markers.
-  BCTypes bc_types;
-  bc_types.add_bc_dirichlet(BDY_DIRICHLET);
-
-  // Enter Dirichlet boundary values.
-  BCValues bc_values;
-  bc_values.add_zero(BDY_DIRICHLET);
-
-  // Create an H1 space with default shapeset.
-  H1Space space(&mesh, &bc_types, &bc_values, P_INIT);
-  int ndof = Space::get_num_dofs(&space);
+  mesh.refine_towards_boundary(BDY_DIRICHLET, INIT_BDY_REF_NUM);
 
   // Initialize the weak formulation.
-  WeakForm wf;
-  wf.add_matrix_form(callback(jac), HERMES_NONSYM, HERMES_ANY);
-  wf.add_vector_form(callback(res), HERMES_ANY);
+  WeakFormHeatTransferNewton wf;
+
+  // Initialize boundary conditions.
+  DefaultEssentialBCConst bc_essential(BDY_DIRICHLET, 0.0);
+  EssentialBCs bcs(&bc_essential);
+
+  // Create an H1 space with default shapeset.
+  H1Space space(&mesh, &bcs, P_INIT);
+  int ndof = Space::get_num_dofs(&space);
 
   // Initialize the FE problem.
   bool is_linear = false;
@@ -107,7 +82,7 @@ int main(int argc, char* argv[])
 
   // Perform Newton's iteration.
   bool verbose = true;
-  if (!solve_newton(coeff_vec, &dp, solver, matrix, rhs, 
+  if (!hermes2d.solve_newton(coeff_vec, &dp, solver, matrix, rhs, 
       NEWTON_TOL, NEWTON_MAX_ITER, verbose)) error("Newton's iteration failed.");
 
   // Translate the resulting coefficient vector into the Solution sln.

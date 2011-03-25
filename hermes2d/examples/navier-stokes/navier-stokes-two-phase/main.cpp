@@ -158,7 +158,7 @@ int main(int argc, char* argv[])
   mesh2.refine_all_elements();
   mesh2.refine_all_elements();
 
-  // Enter boundary markers.
+  // Initialize boundary conditions.
   BCTypes bc_types;
   bc_types.add_bc_dirichlet(BDY_DIRICHLET);
 
@@ -268,7 +268,7 @@ int main(int argc, char* argv[])
     info("---- Adaptivity step %d:", as);
 
     // Construct globally refined reference mesh and setup reference space.
-    Hermes::vector<Space *>* ref_spaces = construct_refined_spaces(Hermes::vector<Space *>(&xvel, &yvel, &press, &lset));
+    Hermes::vector<Space *>* ref_spaces = Space::construct_refined_spaces(Hermes::vector<Space *>(&xvel, &yvel, &press, &lset));
 
     // Assemble the reference problem.
     info("Solving on reference mesh.");

@@ -207,7 +207,7 @@ void Space::set_uniform_order_internal(Ord3 order, int marker) {
 		if (it->second->used && it->second->active) {
       assert(elm_data[it->first] != NULL);
       assert(mesh->elements[it->first]->get_mode() == order.type);
-      if (marker == HERMES_ANY) elm_data[it->first]->order = order;
+      if (marker == HERMES_ANY_INT) elm_data[it->first]->order = order;
       else {
         if (elm_data[it->first]->marker == marker) elm_data[it->first]->order = order;
       }
@@ -2408,10 +2408,10 @@ static scalar default_bc_value_by_coord(int ess_bdy_marker, double x, double y, 
 	return 0.0;
 }
 
-static scalar3 &default_bc_vec_value_by_coord(int ess_bdy_marker, double x, double y, double z) 
+static scalar3 default_bc_vec_value_by_coord(int ess_bdy_marker, double x, double y, double z) 
 {
   _F_
-  static scalar3 val = { 0.0, 0.0, 0.0 };
+  static scalar3 val(0.0, 0.0, 0.0);
   return val;
 }
 
@@ -2534,4 +2534,37 @@ int Space::get_num_dofs(Hermes::vector<Space *> spaces)
   return ndof;
 }
 
+int Space::get_num_dofs(Space* space)
+{ 
+  _F_
+  return space->get_num_dofs();
+} 
+
+// Performs uniform global refinement of a FE space.
+Hermes::vector<Space *>* Space::construct_refined_spaces(Hermes::vector<Space *> coarse, int order_increase)
+{
+  _F_
+  Hermes::vector<Space *> * ref_spaces = new Hermes::vector<Space *>;
+  for (unsigned int i = 0; i < coarse.size(); i++) 
+  {
+    Mesh* ref_mesh = new Mesh;
+    ref_mesh->copy(*coarse[i]->get_mesh());
+    ref_mesh->refine_all_elements(H3D_H3D_H3D_REFT_HEX_XYZ);
+    ref_spaces->push_back(coarse[i]->dup(ref_mesh));
+    (*ref_spaces)[i]->copy_orders(*coarse[i], order_increase);
+  }
+  return ref_spaces;
+}
+
+// Light version for a single space.
+Space* Space::construct_refined_space(Space* coarse, int order_increase)
+{
+  _F_
+  Mesh* ref_mesh = new Mesh;
+  ref_mesh->copy(*coarse->get_mesh());
+  ref_mesh->refine_all_elements(H3D_H3D_H3D_REFT_HEX_XYZ);
+  Space* ref_space = coarse->dup(ref_mesh);
+  ref_space->copy_orders(*coarse, order_increase);
+  return ref_space;
+}
 
