@@ -20,7 +20,7 @@ using Hermes::EigenSolver;
 const int NUMBER_OF_EIGENVALUES = 1;               // Desired number of eigenvalues.
 int P_INIT = 4;                                    // Uniform polynomial degree of mesh elements.
 const int INIT_REF_NUM = 4;                        // DO NOT CHANGE THIS!!
-const int FINAL_REF_NUM = 0;                       // Final global refinement. 
+const int FINAL_REF_NUM = 2;                       // Final global refinement. 
 const double TARGET_VALUE = -2.0;                  // JDSYM parameter: Eigenvalues in the vicinity of this 
                                                    // number will be computed. 
 const double E_LITERATURE=-2.2052684289898; 
@@ -137,7 +137,7 @@ int main(int argc, char* argv[])
 
   double* coeff_vec;
   Solution sln;
-  ScalarView view("Solution", new WinGeom(0, 0, 1024, 768));
+  //ScalarView view("Solution", new WinGeom(0, 0, 1024, 768));
 
   // Read solution vectors from file and visualize.
   double* eigenval = new double[NUMBER_OF_EIGENVALUES];
@@ -152,13 +152,15 @@ int main(int argc, char* argv[])
     Solution::vector_to_solution(coeff_vec, &space, &sln);
 
     // Visualize the solution.
+    /*
     char title[100];
     sprintf(title, "Solution %d, val = %g", ieig, eigenval[ieig]);
     view.set_title(title);
     view.show(&sln);
+    */
 
     // Wait for keypress.
-    View::wait(HERMES_WAIT_KEYPRESS);
+    //View::wait(HERMES_WAIT_KEYPRESS);
   }
 
   double E = eigenval[0];
