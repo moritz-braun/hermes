@@ -84,7 +84,7 @@ public:
     /// Error bilinear form callback function.
     virtual scalar value(int n, double *wt, Func<scalar> *u_ext[],
                          Func<scalar> *u, Func<scalar> *v, Geom<double> *e,
-                         ExtData<scalar> *ext)
+                         ExtData<scalar> *ext) const
     {
       switch (projNormType)
       {
@@ -107,7 +107,7 @@ public:
     /// Error bilinear form to estimate order of a function.
     virtual Ord ord(int n, double *wt, Func<Ord> *u_ext[],
                     Func<Ord> *u, Func<Ord> *v, Geom<Ord> *e,
-                    ExtData<Ord> *ext)
+                    ExtData<Ord> *ext) const
     {
       switch (projNormType)
       {
@@ -236,7 +236,7 @@ public:
 
   /// Refines elements based on results from calc_err_est().
   /** The behavior of adaptivity can be controlled through methods should_ignore_element()
-   *  and can_refine_element() which are inteteded to be overriden if neccessary.
+   *  and can_refine_element() which are inteteded to be overridden if neccessary.
    *  \param[in] refinement_selector A point to a selector which will select a refinement.
    *  \param[in] thr A threshold. The meaning of the threshold is defined by the parameter strat.
    *  \param[in] strat A strategy. It specifies a stop condition which quits processing elements in the Adapt::regular_queue. Possible values are 0, 1, 2, and 3.
@@ -349,7 +349,7 @@ protected: //forms and error evaluation
   Adapt::MatrixFormVolError* error_form[H2D_MAX_COMPONENTS][H2D_MAX_COMPONENTS]; ///< Bilinear forms to calculate error
 
   /// Calculates error between a coarse solution and a reference solution and sorts components according to the error.
-  /** If overrided, this method has to initialize errors (Array::errors), sum of errors (Array::error_sum), norms of components (Array::norm), number of active elements (Array::num_act_elems). Also, it has to fill the regular queue through the method fill_regular_queue().
+  /** If overridden, this method has to initialize errors (Array::errors), sum of errors (Array::error_sum), norms of components (Array::norm), number of active elements (Array::num_act_elems). Also, it has to fill the regular queue through the method fill_regular_queue().
    *  \param[in] error_flags Flags which calculates the error. It can be a combination of ::HERMES_TOTAL_ERROR_REL, ::HERMES_TOTAL_ERROR_ABS, ::HERMES_ELEMENT_ERROR_REL, ::HERMES_ELEMENT_ERROR_ABS.
    *  \return The total error. Interpretation of the error is specified by the parameter error_flags. */
   virtual double calc_err_internal(Hermes::vector<Solution *> slns, Hermes::vector<Solution *> rslns,
@@ -393,7 +393,7 @@ protected: //forms and error evaluation
   /// Builds an ordered queue of elements that are be examined.
   /** The method fills Adapt::standard_queue by elements sorted accordin to their error descending.
    *  The method assumes that Adapt::errors_squared contains valid values.
-   *  If a special order of elements is requested, this method has to be overriden.
+   *  If a special order of elements is requested, this method has to be overridden.
    *  /param[in] meshes An array of pointers to meshes of a (coarse) solution. An index into the array is an index of a component.
    *  /param[in] meshes An array of pointers to meshes of a reference solution. An index into the array is an index of a component. */
   virtual void fill_regular_queue(Mesh** meshes);

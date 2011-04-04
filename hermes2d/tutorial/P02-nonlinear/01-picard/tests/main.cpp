@@ -16,11 +16,14 @@ const double INIT_COND_CONST = 3.0;               // Constant initial condition.
 MatrixSolverType matrix_solver = SOLVER_UMFPACK;  // Possibilities: SOLVER_AMESOS, SOLVER_AZTECOO, SOLVER_MUMPS,
                                                   // SOLVER_PETSC, SOLVER_SUPERLU, SOLVER_UMFPACK.
 
+// Problem parameters.
+double HEAT_SRC = 1.0;
+
 // Boundary markers.
 const std::string BDY_DIRICHLET = "1";
 
 // Weak forms.
-#include "../forms.cpp"
+#include "../definitions.cpp"
 
 int main(int argc, char* argv[])
 {
@@ -48,12 +51,12 @@ int main(int argc, char* argv[])
   Solution sln_prev_iter(&mesh, INIT_COND_CONST);
 
   // Initialize the weak formulation.
-  WeakFormHeatTransfer wf(&sln_prev_iter);
+  CustomWeakFormHeatTransferPicard wf(&sln_prev_iter, HEAT_SRC);
 
   // Perform the Picard's iteration.
   bool verbose = true;
-  hermes2d.solve_picard(&wf, &space, &sln_prev_iter, matrix_solver, PICARD_TOL, 
-	       PICARD_MAX_ITER, verbose);
+  hermes2d.solve_picard(&wf, &space, &sln_prev_iter, matrix_solver, PICARD_TOL,
+               PICARD_MAX_ITER, verbose);
 
   ndof = Space::get_num_dofs(&space);
   info("Coordinate (-10, -10) value = %lf", sln_prev_iter.get_pt_value(-10.0, -10.0));

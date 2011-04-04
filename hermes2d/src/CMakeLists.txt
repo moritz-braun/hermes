@@ -69,12 +69,12 @@ set(SRC
        weakform/weakform.cpp 
 
        neighbor.cpp
-       numerical_flux.cpp
        graph.cpp
        ogprojection.cpp
        h2d_common.cpp  
        discrete_problem.cpp
        runge_kutta.cpp
+       spline.cpp
        boundaryconditions/essential_bcs.cpp
        )
 

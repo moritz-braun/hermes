@@ -28,10 +28,7 @@ MatrixSolverType matrix_solver = SOLVER_UMFPACK;  // Possibilities: SOLVER_AMESO
 const std::string BDY_DIRICHLET = "1";
 
 // Weak forms.
-#include "forms.cpp"
-
-// Initial condition.
-#include "initial_condition.cpp"
+#include "definitions.cpp"
 
 int main(int argc, char* argv[])
 {
@@ -48,14 +45,14 @@ int main(int argc, char* argv[])
   mesh.refine_towards_boundary(BDY_DIRICHLET, INIT_BDY_REF_NUM);
 
   // Initialize boundary conditions.
-  EssentialBCNonConst bc_essential(BDY_DIRICHLET);
+  CustomEssentialBCNonConst bc_essential(BDY_DIRICHLET);
   EssentialBCs bcs(&bc_essential);
 
   // Create an H1 space with default shapeset.
   H1Space space(&mesh, &bcs, P_INIT);
 
   // Initialize the weak formulation
-  WeakFormHeatTransferNewton wf;
+  CustomWeakFormHeatTransferNewton wf;
 
   // Initialize the FE problem.
   bool is_linear = false;
@@ -73,7 +70,7 @@ int main(int argc, char* argv[])
   // coefficient vector for the Newton's method.
   info("Projecting to obtain initial vector for the Newton's method.");
   scalar* coeff_vec = new scalar[Space::get_num_dofs(&space)] ;
-  InitialSolutionHeatTransfer init_sln(&mesh);
+  CustomInitialSolutionHeatTransfer init_sln(&mesh);
   OGProjection::project_global(&space, &init_sln, coeff_vec, matrix_solver); 
 
   // Perform Newton's iteration.

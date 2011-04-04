@@ -1,6 +1,5 @@
 #define HERMES_REPORT_INFO
 #define HERMES_REPORT_ERROR
-#include "../config.h"
 #include "hermes3d.h"
 #include <stdio.h>
 // test of refinement towards the origin for hermes3d
@@ -38,7 +37,7 @@ scalar essential_bc_values(int ess_bdy_marker, double x, double y, double z)
 // potential and weight function for respective molecule
  double TARGET_VALUE = 3.0;
 // Weak forms.
-#include "../forms.cpp"
+#include "../definitions.cpp"
 
 int P_INIT = P;
 int P_INIT_X = P_INIT;                                   // Uniform polynomial degree of mesh elements.
@@ -135,11 +134,13 @@ int main(int argc, char* argv[])
   int ndof = Space::get_num_dofs(&space);
   info("ndof=%d",ndof);
   ExactSolution pot_exact(&mesh,hopot);
+
   // Initialize the weak formulation for left hand side and right hand side , i.e., H and U.
   info("Initializing weak forms...");
   WeakForm wf_left, wf_right;
-  wf_left.add_matrix_form(bilinear_form_left, bilinear_form_ord, HERMES_SYM, HERMES_ANY,Hermes::vector<MeshFunction*>(&pot_exact));
-  wf_right.add_matrix_form(bilinear_form_right,bilinear_form_ord, HERMES_SYM, HERMES_ANY);   
+  wf_left.add_matrix_form(bilinear_form_left, bilinear_form_ord, HERMES_SYM, HERMES_ANY_INT, Hermes::vector<MeshFunction*>(&pot_exact));
+  wf_right.add_matrix_form(bilinear_form_right,bilinear_form_ord, HERMES_SYM, HERMES_ANY_INT);   
+
   // Initialize matrices and matrix solver.
   RCP<CSCMatrix>  matrix_right = rcp(new CSCMatrix());
   info("Assembling RHS matrix....");

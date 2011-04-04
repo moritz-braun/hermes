@@ -221,23 +221,23 @@ scalar* HdivSpace::get_bc_projection(SurfPos* surf_pos, int order)
       surf_pos->t = surf_pos->lo * s + surf_pos->hi * t;
 
       // If the BC on this part of the boundary is constant.
-      EssentialBC *bc = static_cast<EssentialBC *>(essential_bcs->get_boundary_condition(mesh->boundary_markers_conversion.get_user_marker(surf_pos->marker)));
+      EssentialBoundaryCondition *bc = static_cast<EssentialBoundaryCondition *>(essential_bcs->get_boundary_condition(mesh->boundary_markers_conversion.get_user_marker(surf_pos->marker)));
 
-      if (bc->get_value_type() == EssentialBC::BC_CONST)
+      if (bc->get_value_type() == EssentialBoundaryCondition::BC_CONST)
       {
         rhs[i] += pt[j][1] * shapeset->get_fn_value(ii, pt[j][0], -1.0, 1)
         * bc->value_const * el;
       }
       // If the BC is not constant.
-      else if (bc->get_value_type() == EssentialBC::BC_FUNCTION)
+      else if (bc->get_value_type() == EssentialBoundaryCondition::BC_FUNCTION)
       {
         // Find out the (x,y) coordinate.
-        double x, y;
+        double x, y, n_x, n_y, t_x, t_y;
         Nurbs* nurbs = surf_pos->base->is_curved() ? surf_pos->base->cm->nurbs[surf_pos->surf_num] : NULL;
-        CurvMap::nurbs_edge(surf_pos->base, nurbs, surf_pos->surf_num, 2.0*surf_pos->t - 1.0, x, y);
+        CurvMap::nurbs_edge(surf_pos->base, nurbs, surf_pos->surf_num, 2.0*surf_pos->t - 1.0, x, y, n_x, n_y, t_x, t_y);
         // Calculate.
         rhs[i] += pt[j][1] * shapeset->get_fn_value(ii, pt[j][0], -1.0, 1)
-          * bc->value(x, y) * el;
+          * bc->value(x, y, n_x, n_y, t_x, t_y) * el;
       }
     }
   }

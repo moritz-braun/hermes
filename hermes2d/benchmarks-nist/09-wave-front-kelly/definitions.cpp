@@ -1,8 +1,13 @@
 #include "weakform/weakform.h"
 #include "integrals/integrals_h1.h"
 #include "boundaryconditions/essential_bcs.h"
-#include "weakform_library/laplace.h"
+#include "weakform_library/h1.h"
 #include "adapt/kelly_type_adapt.h"
+
+using namespace WeakFormsH1;
+using namespace WeakFormsH1::VolumetricMatrixForms;
+using namespace WeakFormsH1::VolumetricVectorForms;
+using namespace WeakFormsH1::RightHandSides;
 
 /* Right-hand side */
 
@@ -59,7 +64,7 @@ public:
     dy = (e/(c * f));
   };
 
-  Ord ord (Ord x, Ord y) const {
+  virtual Ord ord (Ord x, Ord y) const {
     return Ord(8);  
   }
 
@@ -73,8 +78,8 @@ class CustomWeakFormPoisson : public WeakForm
 {
 public:
   CustomWeakFormPoisson(DefaultNonConstRightHandSide* rhs) : WeakForm(1) {
-    add_matrix_form(new DefaultMatrixFormStiffness(0, 0));
-    add_vector_form(new DefaultVectorFormVolNonConst(0, rhs));
+    add_matrix_form(new DefaultLinearDiffusion(0, 0));
+    add_vector_form(new DefaultVectorFormNonConst(0, rhs));
   };
 };
 
@@ -167,7 +172,7 @@ public:
   InterfaceErrorForm() : ErrorEstimatorForm(0, H2D_DG_INNER_EDGE) {};
   
   template<typename Real, typename Scalar>
-  Scalar interface_estimator(int n, double *wt, Func<Scalar> *u_ext[], Func<Real> *u, Geom<Real> *e, ExtData<Scalar> *ext)
+  Scalar interface_estimator(int n, double *wt, Func<Scalar> *u_ext[], Func<Real> *u, Geom<Real> *e, ExtData<Scalar> *ext) const
   {
     Scalar result = 0.;
     for (int i = 0; i < n; i++)
@@ -178,14 +183,14 @@ public:
 
   virtual scalar value(int n, double *wt, Func<scalar> *u_ext[],
               Func<scalar> *u, Geom<double> *e,
-              ExtData<scalar> *ext)
+              ExtData<scalar> *ext) const
   {
     return interface_estimator<double, scalar>(n, wt, u_ext, u, e, ext);
   }
   
   virtual Ord ord(int n, double *wt, Func<Ord> *u_ext[],
                     Func<Ord> *u, Geom<Ord> *e,
-                    ExtData<Ord> *ext)
+                    ExtData<Ord> *ext) const
   {
     return interface_estimator<Ord, Ord>(n, wt, u_ext, u, e, ext);
   }  

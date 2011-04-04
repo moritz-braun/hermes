@@ -28,7 +28,7 @@ const bool PRECONDITIONING = true;
 const double NOX_LINEAR_TOLERANCE = 1e-2;
 
 const int P_INIT = 0;                                   // Initial polynomial degree.                      
-const int INIT_REF_NUM = 4;                             // Number of initial uniform mesh refinements.                       
+const int INIT_REF_NUM = 3;                             // Number of initial uniform mesh refinements.                       
 double time_step = 1E-2;                                // Time step.
 
 // Equation parameters.
@@ -71,10 +71,13 @@ int main(int argc, char* argv[])
   InitialSolutionEulerDensity prev_rho(&mesh, RHO_EXT);
   InitialSolutionEulerDensityVelX prev_rho_v_x(&mesh, RHO_EXT * V1_EXT);
   InitialSolutionEulerDensityVelY prev_rho_v_y(&mesh, RHO_EXT * V2_EXT);
-  InitialSolutionEulerDensityEnergy prev_e(&mesh, calc_energy(RHO_EXT, RHO_EXT * V1_EXT, RHO_EXT * V2_EXT, P_EXT, KAPPA));
+  InitialSolutionEulerDensityEnergy prev_e(&mesh, QuantityCalculator::calc_energy(RHO_EXT, RHO_EXT * V1_EXT, RHO_EXT * V2_EXT, P_EXT, KAPPA));
+
+  // Numerical flux.
+  OsherSolomonNumericalFlux num_flux(KAPPA);
 
   // Initialize weak formulation.
-  EulerEquationsWeakFormImplicit wf(KAPPA, RHO_EXT, V1_EXT, V2_EXT, P_EXT, BDY_SOLID_WALL, BDY_SOLID_WALL, 
+  EulerEquationsWeakFormImplicit wf(&num_flux, KAPPA, RHO_EXT, V1_EXT, V2_EXT, P_EXT, BDY_SOLID_WALL, BDY_SOLID_WALL, 
     BDY_INLET_OUTLET, BDY_INLET_OUTLET, &prev_rho, &prev_rho_v_x, &prev_rho_v_y, &prev_e, PRECONDITIONING);
   wf.set_time_step(time_step);
 

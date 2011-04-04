@@ -20,10 +20,7 @@ MatrixSolverType matrix_solver = SOLVER_UMFPACK;  // Possibilities: SOLVER_AMESO
 const std::string BDY_DIRICHLET = "1";
 
 // Weak forms.
-#include "../forms.cpp"
-
-// Initial condition.
-#include "initial_condition.cpp"
+#include "../definitions.cpp"
 
 int main(int argc, char* argv[])
 {
@@ -40,7 +37,7 @@ int main(int argc, char* argv[])
   mesh.refine_towards_boundary(BDY_DIRICHLET, INIT_BDY_REF_NUM);
 
   // Initialize boundary conditions.
-  EssentialBCNonConst bc_essential(BDY_DIRICHLET);
+  CustomEssentialBCNonConst bc_essential(BDY_DIRICHLET);
   EssentialBCs bcs(&bc_essential);
 
   // Create an H1 space with default shapeset.
@@ -48,7 +45,7 @@ int main(int argc, char* argv[])
   int ndof = space.get_num_dofs();
 
   // Initialize the weak formulation
-  WeakFormHeatTransferNewton wf;
+  CustomWeakFormHeatTransferNewton wf;
 
   // Initialize the FE problem.
   bool is_linear = false;
@@ -62,16 +59,16 @@ int main(int argc, char* argv[])
   // Initialize the solution.
   Solution sln;
 
-  // Project the initial condition on the FE space to obtain initial 
+  // Project the initial condition on the FE space to obtain initial
   // coefficient vector for the Newton's method.
   info("Projecting to obtain initial vector for the Newton's method.");
   scalar* coeff_vec = new scalar[Space::get_num_dofs(&space)] ;
-  InitialSolutionHeatTransfer init_sln(&mesh);
-  OGProjection::project_global(&space, &init_sln, coeff_vec, matrix_solver); 
+  CustomInitialSolutionHeatTransfer init_sln(&mesh);
+  OGProjection::project_global(&space, &init_sln, coeff_vec, matrix_solver);
 
   // Perform Newton's iteration.
   bool verbose = true;
-  if (!hermes2d.solve_newton(coeff_vec, &dp, solver, matrix, rhs, 
+  if (!hermes2d.solve_newton(coeff_vec, &dp, solver, matrix, rhs,
       NEWTON_TOL, NEWTON_MAX_ITER, verbose)) error("Newton's iteration failed.");
 
   // Translate the resulting coefficient vector into the Solution sln.
@@ -82,7 +79,7 @@ int main(int argc, char* argv[])
   delete matrix;
   delete rhs;
   delete solver;
-  
+
   info("ndof = %d", ndof);
   info("Coordinate (1, 0) value = %lf", sln.get_pt_value(1.0, 0.0));
   info("Coordinate (3, 0) value = %lf", sln.get_pt_value(3.0, 0.0));

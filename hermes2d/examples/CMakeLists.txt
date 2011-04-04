@@ -1,3 +1,4 @@
+add_subdirectory(acoustics)
 add_subdirectory(advection-diffusion-reaction)
 add_subdirectory(euler)
 add_subdirectory(heat-transfer)
@@ -11,6 +12,6 @@ add_subdirectory(neutronics)
 add_subdirectory(poisson)
 add_subdirectory(richards)
 add_subdirectory(schroedinger)
-add_subdirectory(thermoelasticity)
+#add_subdirectory(thermoelasticity) TODO: Convert to new forms.
 add_subdirectory(wave-equation)
 

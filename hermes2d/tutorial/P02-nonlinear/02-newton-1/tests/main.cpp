@@ -18,11 +18,14 @@ const double INIT_COND_CONST = 3.0;               // Constant initial condition.
 MatrixSolverType matrix_solver = SOLVER_UMFPACK;  // Possibilities: SOLVER_AMESOS, SOLVER_AZTECOO, SOLVER_MUMPS,
                                                   // SOLVER_PETSC, SOLVER_SUPERLU, SOLVER_UMFPACK.
 
+// Problem parameters.
+double HEAT_SRC = 1.0;
+
 // Boundary markers.
 const std::string BDY_DIRICHLET = "1";
 
 // Weak forms.
-#include "../forms.cpp"
+#include "../definitions.cpp"
 
 int main(int argc, char* argv[])
 {
@@ -39,7 +42,7 @@ int main(int argc, char* argv[])
   mesh.refine_towards_boundary(BDY_DIRICHLET, INIT_BDY_REF_NUM);
 
   // Initialize the weak formulation.
-  WeakFormHeatTransferNewton wf;
+  CustomWeakFormHeatTransferNewton wf(HEAT_SRC);
 
   // Initialize boundary conditions.
   DefaultEssentialBCConst bc_essential(BDY_DIRICHLET, 0.0);

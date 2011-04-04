@@ -72,7 +72,9 @@ class HERMES_API RungeKutta
 
 public:
   /// Constructor.
-  RungeKutta(DiscreteProblem* dp, ButcherTable* bt, MatrixSolverType matrix_solver = SOLVER_UMFPACK, bool residual_as_vector = true);
+  /// Parameter start_from_zero_K_vector: if set to true, the last K_vector will NOT be used
+  /// as an initial guess for the Newton's method, instead zero vector will be used.
+  RungeKutta(DiscreteProblem* dp, ButcherTable* bt, MatrixSolverType matrix_solver = SOLVER_UMFPACK, bool start_from_zero_K_vector = false, bool residual_as_vector = true);
 
   /// Destructor.
   ~RungeKutta();
@@ -84,7 +86,7 @@ public:
   /// has length num_stages*ndof.
   /// TODO: enable this for other types of matrices.
   void multiply_as_diagonal_block_matrix(UMFPackMatrix* matrix_left, int num_stages,
-                                                    scalar* stage_coeff_vec, scalar* vector_left);
+                                         scalar* stage_coeff_vec, scalar* vector_left);
 
   // Perform one explicit or implicit time step using the Runge-Kutta method
   // corresponding to a given Butcher's table. If err_vec != NULL then it will be 
@@ -94,15 +96,23 @@ public:
   // Many improvements are needed, a todo list is presented at the beginning of
   // the corresponding .cpp file.
   bool rk_time_step(double current_time, double time_step, Hermes::vector<Solution*> slns_time_prev, Hermes::vector<Solution*> slns_time_new,
-                               Hermes::vector<Solution*> error_fns, bool jacobian_changed = true, bool verbose = false, double newton_tol = 1e-6, 
-                               int newton_max_iter = 20, double newton_damping_coeff = 1.0, 
-                               double newton_max_allowed_residual_norm = 1e6);
+                    Hermes::vector<Solution*> error_fns, bool jacobian_changed = true, bool verbose = false, double newton_tol = 1e-6, 
+                    int newton_max_iter = 20, double newton_damping_coeff = 1.0, 
+                    double newton_max_allowed_residual_norm = 1e6);
+  bool rk_time_step(double current_time, double time_step, Solution* slns_time_prev, Solution* slns_time_new,
+                    Solution* error_fn, bool jacobian_changed = true, bool verbose = false, double newton_tol = 1e-6, 
+                    int newton_max_iter = 20, double newton_damping_coeff = 1.0, 
+                    double newton_max_allowed_residual_norm = 1e6);
 
   // This is a wrapper for the previous function if error_fn is not provided
   // (adaptive time stepping is not wanted). 
   bool rk_time_step(double current_time, double time_step, Hermes::vector<Solution*> slns_time_prev, Hermes::vector<Solution*> slns_time_new,
-                               bool jacobian_changed = true, bool verbose = false, double newton_tol = 1e-6, int newton_max_iter = 20, 
-                               double newton_damping_coeff = 1.0, double newton_max_allowed_residual_norm = 1e6);
+                    bool jacobian_changed = true, bool verbose = false, double newton_tol = 1e-6, int newton_max_iter = 20, 
+                    double newton_damping_coeff = 1.0, double newton_max_allowed_residual_norm = 1e6);
+  bool rk_time_step(double current_time, double time_step, Solution* sln_time_prev, Solution* sln_time_new,
+                    bool jacobian_changed = true, bool verbose = false, double newton_tol = 1e-6, int newton_max_iter = 20, 
+                    double newton_damping_coeff = 1.0, double newton_max_allowed_residual_norm = 1e6);
+
 
 protected:
   /// Creates an augmented weak formulation for the multi-stage Runge-Kutta problem.
@@ -145,6 +155,8 @@ protected:
                               // size num_stages*ndof times num_stages*ndof.
   WeakForm stage_wf_left;     // For the matrix M (size ndof times ndof).
   
+  bool start_from_zero_K_vector;
+
   bool residual_as_vector;
 
   // Vector K_vector of length num_stages * ndof. will represent
@@ -156,6 +168,9 @@ protected:
 
   // Vector for the left part of the residual.
   scalar* vector_left;
+
+  // Number of previous calls to rk_time_step().
+  unsigned int iteration;
 };
 
 
