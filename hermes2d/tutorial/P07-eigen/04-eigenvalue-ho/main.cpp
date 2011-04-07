@@ -100,6 +100,7 @@ int main(int argc, char* argv[])
     // Wait for keypress.
     View::wait(HERMES_WAIT_KEYPRESS);
   }
+
   return 0; 
-}
+};
 

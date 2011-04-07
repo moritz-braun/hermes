@@ -1,0 +1,21 @@
+# size of the mesh
+a =  4.0
+
+vertices = [
+  [ -a, -a ],    # vertex 0
+  [ a, -a ],    # vertex 1
+  [ a, a ],    # vertex 2
+  [ -a, a ]     # vertex 3
+]
+
+elements = [
+  [ 0, 1, 2, 3, 0 ]  # quad 0
+]
+
+boundaries = [
+  [ 0, 1, "Zero Dirichlet" ],
+  [ 1, 2, "Zero Dirichlet" ],
+  [ 2, 3, "Zero Dirichlet" ],
+  [ 3, 0, "Zero Dirichlet" ]
+]
+
